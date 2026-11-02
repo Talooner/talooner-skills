@@ -89,6 +89,7 @@ expect_private_hit "github.com/Talooner/talooner.git"
 expect_private_hit "github.com/Talooner/talooner-plugin"
 expect_private_hit "github.com/Talooner/talooner-runner"
 expect_private_hit "Talooner/talooner"
+expect_private_hit "https://github.com/Talooner/talooner-skills and github.com/Talooner/talooner-plugin"
 
 expect_secret_clean "TLN1.<payload>.<signature>"
 expect_secret_clean "<your-key>"
