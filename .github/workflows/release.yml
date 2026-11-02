@@ -1,0 +1,20 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh scripts/*.sh test/run.sh
+      - run: ./scripts/check-skill.sh
+      - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test .talooner/
+      - run: ./test/run.sh
+      - run: zip -r talooner-onboard.zip talooner-onboard
+      - run: gh release create "$GITHUB_REF_NAME" talooner-onboard.zip --title "$GITHUB_REF_NAME" --notes "talooner-onboard $GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}
