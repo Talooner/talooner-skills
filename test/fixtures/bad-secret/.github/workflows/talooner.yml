@@ -1,0 +1,17 @@
+name: talooner
+on:
+  pull_request:
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test .talooner/
+  review:
+    needs: rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker://ghcr.io/talooner/talooner-runner:1.1.2-gh
+        env:
+          TALOONER_LICENSE_KEY: ${{ secrets.TALOONER_LICENSE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}

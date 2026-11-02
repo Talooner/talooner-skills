@@ -1,0 +1,167 @@
+test "A PR with no description is blocked" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.draft" false
+    attr 1 "pr.has_description" false
+
+    record 2 type "pr"
+    attr 2 "pr.draft" false
+    attr 2 "pr.has_description" true
+  }
+
+  when rule "Block PRs with no description"
+
+  expect {
+    flagged 1
+    not flagged 2
+    did 1 block "pr.merge"
+    did_not 2 block "pr.merge"
+  }
+}
+
+test "A draft with no description is left alone" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.draft" true
+    attr 1 "pr.has_description" false
+  }
+
+  when rule "Block PRs with no description"
+
+  expect {
+    not flagged 1
+  }
+}
+
+test "A sensitive path needs its reviewer" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" ["internal/auth/session.go"]
+
+    record 2 type "pr"
+    attr 2 "pr.changed_files" ["README.md"]
+
+    record 3 type "pr"
+    attr 3 "pr.changed_files" ["src/authorization/roles.go"]
+  }
+
+  when rule "Critical path needs review"
+
+  expect {
+    flagged 1
+    not flagged 2
+    not flagged 3
+    did 1 require "review.owners"
+    did_not 2 require "review.owners"
+  }
+}
+
+test "An empty changed_files list matches no critical path" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" []
+  }
+
+  when rule "Critical path needs review"
+
+  expect {
+    not flagged 1
+  }
+}
+
+test "The oversized boundary is inclusive" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.lines_changed" 1500
+
+    record 2 type "pr"
+    attr 2 "pr.lines_changed" 1499
+  }
+
+  when rule "Oversized PR needs human review"
+
+  expect {
+    flagged 1
+    not flagged 2
+  }
+}
+
+test "A confident high risk needs a senior review" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.risk" "high"
+    attr 1 "pr.risk_certainty" 0.9
+
+    record 2 type "pr"
+    attr 2 "pr.risk" "high"
+    attr 2 "pr.risk_certainty" 0.84
+
+    record 3 type "pr"
+    attr 3 "pr.risk" "low"
+    attr 3 "pr.risk_certainty" 0.95
+  }
+
+  when rule "Confident high risk needs a senior review"
+
+  expect {
+    flagged 1
+    not flagged 2
+    not flagged 3
+    did 1 require "review.senior"
+  }
+}
+
+test "A confident vague description gets a comment" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.description_kind" "vague"
+    attr 1 "pr.description_certainty" 0.9
+
+    record 2 type "pr"
+    attr 2 "pr.description_kind" "explains why"
+    attr 2 "pr.description_certainty" 0.9
+  }
+
+  when rule "Confident vague description gets a comment"
+
+  expect {
+    flagged 1
+    not flagged 2
+    did 1 comment "pr" contains "why"
+  }
+}
+
+test "The risk decision calls the configured model" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.title" "Add refunds"
+    attr 1 "pr.body" "Adds a refund endpoint"
+    attr 1 "pr.changed_files" ["billing/refund.go"]
+  }
+
+  mock tool "cdm" "decide" { returns { chosen "high" certainty 0.9 } }
+
+  when enrich "cdm: how risky is this PR?"
+
+  expect {
+    count == 1
+    tool_called "cdm" "decide"
+  }
+}
+
+test "The description decision calls the configured model" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.title" "Refactor"
+    attr 1 "pr.body" "Changes files"
+  }
+
+  mock tool "cdm" "decide" { returns { chosen "vague" certainty 0.9 } }
+
+  when enrich "cdm: does the description say why?"
+
+  expect {
+    count == 1
+    tool_called "cdm" "decide"
+  }
+}
