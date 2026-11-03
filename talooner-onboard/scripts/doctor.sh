@@ -45,6 +45,22 @@ if [ -d .talooner/rules ]; then
 fi
 printf '%s\n' "${found:-none}"
 
+split=no
+for f in .talooner/rules/*.tln; do [ -f "$f" ] && split=yes; done
+printf 'split_ruleset=%s\n' "$split"
+if [ -f .talooner/test-rules.sh ]; then
+  printf 'rules_test_script=.talooner/test-rules.sh\n'
+else
+  printf 'rules_test_script=none\n'
+fi
+
+printf 'manifests='
+found=
+for f in go.mod package.json Gemfile pyproject.toml requirements.txt Cargo.toml pom.xml build.gradle build.gradle.kts composer.json; do
+  [ -f "$f" ] && found="$found $f"
+done
+printf '%s\n' "${found:-none}"
+
 printf 'ci_files='
 found=
 for f in .github/workflows/talooner.yml .github/workflows/talooner.yaml .gitlab-ci.yml; do
@@ -69,7 +85,7 @@ printf '%s\n' "${found:-none}"
 
 printf 'ignored_targets='
 found=
-for f in .talooner/onboarding.md .talooner/rules.tln .talooner/rules.tln.test .talooner/config.yaml .talooner/teams.yaml .talooner/architecture.yaml .talooner/review.md .github/workflows/talooner.yml docs/guides/example.md; do
+for f in .talooner/onboarding.md .talooner/rules.tln .talooner/rules.tln.test .talooner/test-rules.sh .talooner/rules/_predicates.tln .talooner/rules/example.tln .talooner/config.yaml .talooner/teams.yaml .talooner/architecture.yaml .talooner/review.md .github/workflows/talooner.yml docs/guides/example.md; do
   if git check-ignore -q --no-index "$f" 2>/dev/null; then found="$found $f"; fi
 done
 printf '%s\n' "${found:-none}"

@@ -53,6 +53,31 @@ print("TLN1.%s.%s" % (payload, "signature"))' "$1" "$2"
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/clean-repo"
 expect_verify clean-repo "$TMP/clean-repo" 0
 
+make_repo "$ROOT/test/fixtures/split-rules" "$TMP/split-rules"
+expect_verify split-rules "$TMP/split-rules" 0
+
+make_repo "$ROOT/test/fixtures/split-rules" "$TMP/split-no-script"
+mv "$TMP/split-no-script/.talooner/test-rules.sh" "$TMP/split-no-script/test-rules.removed"
+git -C "$TMP/split-no-script" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/split-no-script" -c user.name=fixture -c user.email=fixture@example.com commit -qm split-no-script
+expect_verify split-no-script "$TMP/split-no-script" 1
+if grep -q 'test-rules.sh' "$TMP/split-no-script.out"; then
+  pass "verify names the missing test-rules.sh"
+else
+  bad "verify does not name the missing test-rules.sh"
+fi
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/missing-guide"
+mv "$TMP/missing-guide/docs/guides/app.md" "$TMP/missing-guide/docs/guides/app.removed"
+git -C "$TMP/missing-guide" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/missing-guide" -c user.name=fixture -c user.email=fixture@example.com commit -qm missing-guide
+expect_verify missing-guide "$TMP/missing-guide" 1
+if grep -q 'missing doc_ref: docs/guides/app.md' "$TMP/missing-guide.out"; then
+  pass "verify names the missing doc_ref"
+else
+  bad "verify does not name the missing doc_ref"
+fi
+
 out="$TMP/clean-repo.incomplete"
 if "$VERIFY" --repo "$TMP/clean-repo" >"$out" 2>&1 && grep -q '^verify: INCOMPLETE' "$out"; then
   pass "verify reports INCOMPLETE without credentials"

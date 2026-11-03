@@ -1,0 +1,9 @@
+rule "Billing needs review" {
+  for records where type == "pr" and is "needs_review"
+  block "merge"
+  do block "pr.merge"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "Billing change; a human approval releases it"
+  reason "billing"
+  priority HIGH
+}

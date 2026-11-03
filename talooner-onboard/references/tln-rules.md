@@ -49,8 +49,9 @@ unset for a new file with no last toucher, and the action then no-ops with
 ## Matching
 
 - `contains`, `starts_with`, `ends_with` are substring scans, not globs.
-- Paths need a trailing slash: `contains "auth/"`. Test lookalikes such as
-  `src/authorization/`.
+- Paths need a trailing slash. Prefer `starts_with "auth/"` for a path prefix:
+  `contains ".talooner/"` also matches `vendor/.talooner/`. Test lookalikes such
+  as `src/authorization/`.
 - `attr "pr.changed_files"` is a list. `contains` matches when any element does.
   An empty list matches nothing.
 - An unset fact is false. A positive condition on it does not fire. A negated
@@ -91,27 +92,76 @@ Do not write:
 - `pr.new_dependencies`
 - `user.owner` (CODEOWNERS, else the last person to touch the code)
 - `review.human.approved`, `review.changes_requested`, `review.<team>.approved`
-- `unit.llm_result`, `unit.llm_explanation`, `unit.important`
+- `unit.important`, `unit.llm_result`, `unit.llm_explanation`, `unit.doc_content`,
+  `unit.diff`, `unit.content`, `unit.changed_lines`, `unit.test_diff`,
+  `unit.spec`
 - `pr.risk`, `pr.risk_certainty`, `pr.description_kind`,
   `pr.description_certainty`
 
 ## AI review
 
-The base ruleset reviews documented units. A tenant `enrich` block is only for an
-explicit override:
+`architecture.yaml` is the switch. A changed folder with no entry produces no
+`code_unit`, so the model reads nothing and no inline comment can land. An entry
+with `doc_ref` is AI-reviewed; an entry without one is rules-only.
+
+The starter ships a sections review. It only selects a unit that is important
+and has a guide, so doc-less units are never sent:
 
 ```tln
 enrich "Review changed code against its guide" {
-  for records where type == "code_unit" and attr "unit.important" == true
+  for records where type == "code_unit"
+    and attr "unit.important" == true
+    and attr "unit.doc_content" != ""
+  stale_after 1 hour
   tool "llm" "review" {
-    doc  attr "unit.doc_content"
-    diff attr "unit.diff"
+    doc   attr "unit.doc_content"
+    diff  attr "unit.diff"
+    mode  "sections"
+    quote_rule true
   }
   update attr "unit.llm_result" from result.verdict
 }
 ```
 
+`mode "sections"` reads the guide one `###` heading at a time and quotes the
+rule's first sentence. `Applies to:` narrows a section to part of the unit. A
+unit with no guide, or with no confirmed section, is skipped by the doc guard.
+
+The base ruleset also reviews documented units, so a tenant enrich is an
+explicit override. Keep the doc guard: without it, every unit costs tokens.
+
 Handle `unclear` and `error`; never leave them silent.
+
+## Guides
+
+- Six to twelve `###` sections, one rule each; the first sentence is the rule.
+- `Applies to:` for a scoped section.
+- `## Specs` with `### <file path>` and one bullet per required case.
+- `## Advice` for taste that does not block.
+- Never duplicate a linter finding; name the file and the fix.
+- `thresholds.yaml` is optional calibration, not a rule file. Leave it out
+  unless the user has numbers they want respected.
+
+## Architecture
+
+```yaml
+- path: app/
+  kind: service
+  doc_ref: docs/guides/app.md
+- path: app/services/
+  kind: service
+  inherit: false
+- path: app/main.go
+  kind: service
+- path: internal/
+  kind: service
+```
+
+- Longest prefix wins; a file may be its own entry.
+- A nested entry inherits the nearest parent `doc_ref` unless it sets
+  `inherit: false`.
+- `doc_ref` is the AI review switch. No `doc_ref`, no AI review.
+- `kind` is `model`, `controller` or `service`.
 
 ## Decision model
 
@@ -188,7 +238,8 @@ Never delete a failing test to make the suite green. Fix the rule or ask the use
 ## Files
 
 - `.talooner/rules.tln` plus `.talooner/rules.tln.test`
-- or `.talooner/rules/*.tln` with `.tln.test` next to each file
+- or `.talooner/rules/*.tln` with `.tln.test` next to each file, plus
+  `.talooner/test-rules.sh`
 - `.talooner/config.yaml` — `checks.tests` and `checks.lint` job names
 - `.talooner/teams.yaml` — logical team name to GitHub team, GitLab group, or user
   list. Write it only when a rule uses `do require`:
@@ -202,11 +253,27 @@ Never delete a failing test to make the suite green. Fix the rule or ask the use
 
   `review.owners` resolves the `owners` key. A list needs no host lookup.
 - `.talooner/architecture.yaml` — folder, `kind` (`model`, `controller` or
-  `service`), `doc_ref`
+  `service`), `doc_ref`; see Architecture above
 - `.talooner/review.md` — repo-wide guidelines, under 16 KiB
 - `docs/guides/<area>.md` — the guide the AI review reads
 
+## Split rulesets
+
+Talooner joins `.talooner/rules/` into one ruleset: files starting with `_`
+first, then the rest by name. `tln test .talooner/` walks the folder and pairs
+each `foo.tln` with `foo.tln.test` on its own, so a file that uses a `define`
+from `_predicates.tln` fails with `undefined define reference`.
+
+Ship `.talooner/test-rules.sh` (copy `assets/test-rules.sh`). It joins the files
+in Talooner's order into a temp folder and runs `tln test` on the result. It is
+POSIX `sh`; keep `set -eu`, `mktemp`, the `trap` cleanup and `LC_ALL=C`.
+
+```sh
+sh .talooner/test-rules.sh
+```
+
 If `.talooner/rules/` has any `.tln` file, `.talooner/rules.tln` is not read.
-Tailor the split files instead of adding a shadowing single file.
+Tailor the split files instead of adding a shadowing single file. A split
+ruleset without the script is not ready; `verify.sh` fails and names it.
 
 Rules are not capped by plan.

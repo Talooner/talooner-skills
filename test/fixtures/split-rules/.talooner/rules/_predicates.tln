@@ -1,0 +1,7 @@
+define "billing_path" {
+  attr "pr.changed_files" starts_with "billing/"
+}
+
+define "needs_review" {
+  is "billing_path" not attr "review.human.approved" == true
+}

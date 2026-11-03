@@ -1,2 +1,3 @@
 - path: app/
   kind: service
+  doc_ref: docs/guides/app.md

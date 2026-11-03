@@ -145,6 +145,11 @@ For each, ask:
 - What is this code responsible for?
 - Who reviews it? A GitHub team slug, a GitLab group, or a list of users.
 - Should a change hold the merge while blocking is on?
+- How is it released? Default: a human approval on the head commit
+  (`review.human.approved`, or `review.<team>.approved` on GitLab), with
+  `review.changes_requested` false. A gate with no release condition is a PR
+  nobody can merge.
+- Who is the fallback reviewer when the owner is away?
 
 Confirm, drop or add. Never invent a business rule.
 
@@ -169,7 +174,17 @@ Ask only where they apply:
 
 Default no. Explain that auto-approve is the riskiest rule. If requested, require
 confirmed test and lint check names, and approve only small, tested, documented,
-non-sensitive, non-draft PRs. Add tests for unset facts and critical paths.
+non-sensitive, non-draft PRs with no open gate. Add tests for unset facts and
+critical paths.
+
+Say plainly:
+
+- It is PR-level and cannot see `unit.*` facts. A unit-level AI block still wins
+  because `block` beats `approve`; the approval comment can look contradictory.
+- On GitLab the bot's approval counts toward required approvals. That is a policy
+  decision, not a convenience.
+- If check names are not confirmed, `pr.tests_passing` is unset and auto-approve
+  never fires. Leave it that way rather than guessing.
 
 ## 10. Check names
 
@@ -207,18 +222,25 @@ Propose candidate folders from the approved analysis, not just sensitive ones:
 Name the folders left without an entry, and say a change there is reviewed by
 rules only.
 
-For each selected folder ask:
+First build a stack profile per root from the manifests and approved analysis:
+language, framework, version. Use it to propose roots and candidate guide
+sections (`references/guide-prompts.md`). Ask which existing docs, ADRs or
+linter rules to reuse.
 
-- What is this code responsible for?
-- Which mistakes have hurt you here?
-- What must never happen?
-- What does the wrong version look like?
-- Which tests must exist for each file?
+For each selected folder ask the five questions:
+
+1. What must never happen here?
+2. What has actually broken, or caused an incident?
+3. What do reviewers always comment on?
+4. What is fine and should not be commented on?
+5. Show me one file that is the example to follow.
 
 Write `architecture.yaml` entries for every confirmed folder, with `doc_ref` only
-where the user answered the questions above, and `docs/guides/<area>.md` for each
-of those. Check each section against the current code and report violations; do
-not fix them silently.
+where the user answered the questions above, and `docs/guides/<area>.md` in the
+template shape for each of those. Turn 1–3 into `###` sections, 4 into
+`review.md` or `## Advice`, 5 into a golden example under `## Specs`. If the user
+has no opinion on a question, leave the section out. Check each section against
+the current code and report violations; do not fix them silently.
 
 ## 12. Repo-wide guidelines
 

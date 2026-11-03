@@ -10,8 +10,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh scripts/*.sh test/run.sh
+      - name: tag matches metadata.version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^  version: //p' talooner-onboard/SKILL.md | head -1)
+          if [ "$tag" != "$version" ]; then
+            echo "tag $tag does not match metadata.version $version"
+            exit 1
+          fi
+      - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh talooner-onboard/assets/test-rules.sh scripts/*.sh test/run.sh
       - run: ./scripts/check-skill.sh
+      - run: docker run --rm -v "$PWD/talooner-onboard/assets:/repo/assets:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test assets/
       - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test .talooner/
       - run: ./test/run.sh
       - run: zip -r talooner-onboard.zip talooner-onboard

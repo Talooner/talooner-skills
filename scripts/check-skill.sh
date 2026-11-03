@@ -101,11 +101,56 @@ else
   bad "starter rules use requires without do require"
 fi
 
-if grep -Fq 'contains ".talooner/"' "$skill/assets/rules.tln"; then
+if grep -Fq 'starts_with ".talooner/"' "$skill/assets/rules.tln"; then
   ok "starter rules protect .talooner/"
 else
   bad "starter rules do not protect .talooner/"
 fi
+
+for needle in 'under_review' 'review.human.approved' 'pr.files_changed'; do
+  if grep -Fq "$needle" "$skill/assets/rules.tln"; then
+    ok "starter rules use $needle"
+  else
+    bad "starter rules do not use $needle"
+  fi
+done
+
+if grep -Fq 'rule "Auto-approve safe changes"' "$skill/assets/rules.tln"; then
+  ok "starter rules have the auto-approve rule"
+else
+  bad "starter rules have no auto-approve rule"
+fi
+
+if perl -0777 -ne '
+    my @defs = /\bdefine\s+"([A-Za-z_]+_pending)"/g;
+    if (!@defs) { print "no _pending defines\n"; exit 1 }
+    my ($body) = /\brule\s+"Auto-approve safe changes"\s*\{(.*?)\n\}/s;
+    if (!$body) { print "no auto-approve rule\n"; exit 1 }
+    for my $d (@defs) {
+      if ($body !~ /\bnot\s+is\s+"\Q$d\E"/) { print "auto-approve does not negate $d\n"; exit 1 }
+    }
+    exit 0;
+  ' < "$skill/assets/rules.tln"; then
+  ok "auto-approve negates every PR-level gate"
+else
+  bad "auto-approve does not negate every PR-level gate"
+fi
+
+if grep -Eq 'mode[[:space:]]+"sections"' "$skill/assets/rules.tln"; then
+  ok "starter rules ship the sections review"
+else
+  bad "starter rules have no sections review"
+fi
+
+if grep -Fq 'attr "unit.doc_content" != ""' "$skill/assets/rules.tln"; then
+  ok "starter sections review skips doc-less units"
+else
+  bad "starter sections review has no doc guard"
+fi
+
+for f in assets/guide.md references/guide-prompts.md assets/test-rules.sh; do
+  if [ -f "$skill/$f" ]; then ok "shipped file exists: $f"; else bad "shipped file missing: $f"; fi
+done
 
 expect_private_clean "https://github.com/Talooner/talooner-skills"
 expect_private_clean "github.com/Talooner/talooner-skills.git"

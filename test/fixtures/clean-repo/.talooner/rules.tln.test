@@ -33,34 +33,48 @@ test "A draft with no description is left alone" {
   }
 }
 
-test "A sensitive path assigns its reviewer" {
+test "An unset draft fact is treated as ready for review" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.has_description" false
+  }
+
+  when rule "Block PRs with no description"
+
+  expect {
+    flagged 1
+  }
+}
+
+test "A sensitive path waits for a human approval" {
   given {
     record 1 type "pr"
     attr 1 "pr.changed_files" [".talooner/rules.tln"]
 
     record 2 type "pr"
-    attr 2 "pr.changed_files" ["internal/auth/session.go"]
+    attr 2 "pr.changed_files" [".talooner/rules.tln"]
+    attr 2 "review.human.approved" true
 
     record 3 type "pr"
-    attr 3 "pr.changed_files" ["README.md"]
+    attr 3 "pr.changed_files" [".talooner/rules.tln"]
+    attr 3 "review.human.approved" true
+    attr 3 "review.changes_requested" true
 
     record 4 type "pr"
-    attr 4 "pr.changed_files" ["src/authorization/roles.go"]
-
-    record 5 type "pr"
-    attr 5 "pr.changed_files" [".talooner-bak/rules.tln"]
+    attr 4 "pr.changed_files" [".talooner/rules.tln"]
+    attr 4 "review.human.approved" false
   }
 
   when rule "Critical path needs review"
 
   expect {
     flagged 1
-    flagged 2
-    not flagged 3
-    not flagged 4
-    not flagged 5
+    not flagged 2
+    flagged 3
+    flagged 4
+    did 1 block "pr.merge"
     did 1 assign "pr"
-    did_not 3 assign "pr"
+    did_not 2 block "pr.merge"
   }
 }
 
@@ -77,31 +91,147 @@ test "An empty changed_files list matches no critical path" {
   }
 }
 
-test "The oversized boundary is inclusive and assigns the owner" {
+test "Path lookalikes do not match the critical path" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" [".talooner/rules.tln"]
+
+    record 2 type "pr"
+    attr 2 "pr.changed_files" ["vendor/.talooner/rules.tln"]
+
+    record 3 type "pr"
+    attr 3 "pr.changed_files" ["auth/session.go"]
+
+    record 4 type "pr"
+    attr 4 "pr.changed_files" ["src/authorization/roles.go"]
+
+    record 5 type "pr"
+    attr 5 "pr.changed_files" ["billing/refund.go"]
+
+    record 6 type "pr"
+    attr 6 "pr.changed_files" ["migrations/0001_init.sql"]
+
+    record 7 type "pr"
+    attr 7 "pr.changed_files" [".talooner-bak/rules.tln"]
+  }
+
+  when rule "Critical path needs review"
+
+  expect {
+    flagged 1
+    not flagged 2
+    flagged 3
+    not flagged 4
+    flagged 5
+    flagged 6
+    not flagged 7
+  }
+}
+
+test "The big sensitive boundary is exclusive on both axes" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" ["billing/refund.go"]
+    attr 1 "pr.lines_changed" 400
+
+    record 2 type "pr"
+    attr 2 "pr.changed_files" ["billing/refund.go"]
+    attr 2 "pr.lines_changed" 401
+
+    record 3 type "pr"
+    attr 3 "pr.changed_files" ["billing/refund.go"]
+    attr 3 "pr.files_changed" 25
+
+    record 4 type "pr"
+    attr 4 "pr.changed_files" ["billing/refund.go"]
+    attr 4 "pr.files_changed" 26
+  }
+
+  when rule "Big sensitive PR needs human review"
+
+  expect {
+    not flagged 1
+    flagged 2
+    not flagged 3
+    flagged 4
+    did 2 assign "pr"
+    did 4 block "pr.merge"
+  }
+}
+
+test "A small sensitive PR is not big" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" ["auth/session.go"]
+    attr 1 "pr.lines_changed" 20
+    attr 1 "pr.files_changed" 2
+  }
+
+  when rule "Big sensitive PR needs human review"
+
+  expect {
+    not flagged 1
+  }
+}
+
+test "The huge boundary is exclusive on both axes" {
   given {
     record 1 type "pr"
     attr 1 "pr.lines_changed" 1500
 
     record 2 type "pr"
-    attr 2 "pr.lines_changed" 1499
+    attr 2 "pr.lines_changed" 1501
+
+    record 3 type "pr"
+    attr 3 "pr.files_changed" 70
+
+    record 4 type "pr"
+    attr 4 "pr.files_changed" 71
   }
 
-  when rule "Oversized PR needs human review"
+  when rule "Huge PR needs human review"
+
+  expect {
+    not flagged 1
+    flagged 2
+    not flagged 3
+    flagged 4
+    did 2 block "pr.merge"
+    did 2 assign "pr"
+  }
+}
+
+test "A huge PR is released by a human approval" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.lines_changed" 1600
+
+    record 2 type "pr"
+    attr 2 "pr.lines_changed" 1600
+    attr 2 "review.human.approved" true
+  }
+
+  when rule "Huge PR needs human review"
 
   expect {
     flagged 1
     not flagged 2
-    did 1 assign "pr"
   }
 }
 
 test "Pending checks leave a visible comment" {
   given {
     record 1 type "pr"
+    attr 1 "pr.draft" false
     attr 1 "pr.checks_pending" true
 
     record 2 type "pr"
+    attr 2 "pr.draft" false
     attr 2 "pr.checks_pending" false
+
+    record 3 type "pr"
+    attr 3 "pr.draft" true
+    attr 3 "pr.checks_pending" true
   }
 
   when rule "CI checks still running"
@@ -109,11 +239,12 @@ test "Pending checks leave a visible comment" {
   expect {
     flagged 1
     not flagged 2
+    not flagged 3
     did 1 comment "pr" contains "checks"
   }
 }
 
-test "A confident high risk assigns the owner" {
+test "A confident high risk waits for a human" {
   given {
     record 1 type "pr"
     attr 1 "pr.risk" "high"
@@ -126,6 +257,11 @@ test "A confident high risk assigns the owner" {
     record 3 type "pr"
     attr 3 "pr.risk" "low"
     attr 3 "pr.risk_certainty" 0.95
+
+    record 4 type "pr"
+    attr 4 "pr.risk" "high"
+    attr 4 "pr.risk_certainty" 0.9
+    attr 4 "review.human.approved" true
   }
 
   when rule "Confident high risk needs a senior review"
@@ -134,27 +270,8 @@ test "A confident high risk assigns the owner" {
     flagged 1
     not flagged 2
     not flagged 3
+    not flagged 4
     did 1 assign "pr"
-  }
-}
-
-test "A confident vague description gets a comment" {
-  given {
-    record 1 type "pr"
-    attr 1 "pr.description_kind" "vague"
-    attr 1 "pr.description_certainty" 0.9
-
-    record 2 type "pr"
-    attr 2 "pr.description_kind" "explains why"
-    attr 2 "pr.description_certainty" 0.9
-  }
-
-  when rule "Confident vague description gets a comment"
-
-  expect {
-    flagged 1
-    not flagged 2
-    did 1 comment "pr" contains "why"
   }
 }
 
@@ -193,6 +310,180 @@ test "The description decision calls the configured model" {
   }
 }
 
+test "A confident vague description gets a comment" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.description_kind" "vague"
+    attr 1 "pr.description_certainty" 0.9
+
+    record 2 type "pr"
+    attr 2 "pr.description_kind" "explains why"
+    attr 2 "pr.description_certainty" 0.9
+  }
+
+  when rule "Confident vague description gets a comment"
+
+  expect {
+    flagged 1
+    not flagged 2
+    did 1 comment "pr" contains "why"
+  }
+}
+
+test "Auto-approve approves a safe PR" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.draft" false
+    attr 1 "pr.has_description" true
+    attr 1 "pr.tests_passing" true
+    attr 1 "pr.changed_files" ["app/handler.go"]
+    attr 1 "pr.lines_changed" 10
+    attr 1 "pr.files_changed" 1
+  }
+
+  when rule "Auto-approve safe changes"
+
+  expect {
+    flagged 1
+    did 1 approve "pr"
+    did 1 comment "pr" contains "No PR-level rule holds this PR."
+  }
+}
+
+test "Auto-approve stays off every gate" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.draft" true
+    attr 1 "pr.has_description" true
+    attr 1 "pr.tests_passing" true
+
+    record 2 type "pr"
+    attr 2 "pr.draft" false
+    attr 2 "pr.has_description" false
+    attr 2 "pr.tests_passing" true
+
+    record 3 type "pr"
+    attr 3 "pr.draft" false
+    attr 3 "pr.has_description" true
+
+    record 4 type "pr"
+    attr 4 "pr.draft" false
+    attr 4 "pr.has_description" true
+    attr 4 "pr.tests_passing" true
+    attr 4 "review.changes_requested" true
+
+    record 5 type "pr"
+    attr 5 "pr.draft" false
+    attr 5 "pr.has_description" true
+    attr 5 "pr.tests_passing" true
+    attr 5 "pr.changed_files" ["auth/session.go"]
+
+    record 6 type "pr"
+    attr 6 "pr.draft" false
+    attr 6 "pr.has_description" true
+    attr 6 "pr.tests_passing" true
+    attr 6 "pr.changed_files" ["billing/refund.go"]
+    attr 6 "pr.lines_changed" 500
+
+    record 7 type "pr"
+    attr 7 "pr.draft" false
+    attr 7 "pr.has_description" true
+    attr 7 "pr.tests_passing" true
+    attr 7 "pr.lines_changed" 1600
+
+    record 8 type "pr"
+    attr 8 "pr.draft" false
+    attr 8 "pr.has_description" true
+    attr 8 "pr.tests_passing" true
+    attr 8 "pr.risk" "high"
+    attr 8 "pr.risk_certainty" 0.9
+  }
+
+  when rule "Auto-approve safe changes"
+
+  expect {
+    not flagged 1
+    not flagged 2
+    not flagged 3
+    not flagged 4
+    not flagged 5
+    not flagged 6
+    not flagged 7
+    not flagged 8
+    did_not 1 approve "pr"
+    did_not 5 approve "pr"
+  }
+}
+
+test "A human approval releases the gate rule" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.changed_files" ["auth/session.go"]
+    attr 1 "review.human.approved" true
+  }
+
+  when rule "Critical path needs review"
+
+  expect {
+    not flagged 1
+  }
+}
+
+test "A human approval lets auto-approve fire" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.draft" false
+    attr 1 "pr.has_description" true
+    attr 1 "pr.tests_passing" true
+    attr 1 "pr.changed_files" ["auth/session.go"]
+    attr 1 "review.human.approved" true
+  }
+
+  when rule "Auto-approve safe changes"
+
+  expect {
+    flagged 1
+    did 1 approve "pr"
+  }
+}
+
+test "A documented unit is sent to the reviewer" {
+  given {
+    record 1 type "code_unit"
+    attr 1 "unit.important" true
+    attr 1 "unit.doc_content" "# Billing\n\n### Amounts are decimal strings"
+
+    record 2 type "code_unit"
+    attr 2 "unit.important" true
+    attr 2 "unit.doc_content" ""
+  }
+
+  mock tool "llm" "review" { returns { verdict "match" explanation "ok" } }
+
+  when enrich "Review changed code against its guide"
+
+  expect {
+    count == 1
+    tool_called "llm" "review" with { doc == "# Billing\n\n### Amounts are decimal strings" }
+  }
+}
+
+test "A unit without a guide is never sent" {
+  given {
+    record 1 type "code_unit"
+    attr 1 "unit.important" true
+    attr 1 "unit.doc_content" ""
+  }
+
+  mock tool "llm" "review" { returns { verdict "match" explanation "ok" } }
+
+  when enrich "Review changed code against its guide"
+
+  expect {
+    count == 0
+  }
+}
+
 test "An inconclusive AI review asks for a human" {
   given {
     record 1 type "code_unit"
@@ -209,6 +500,19 @@ test "An inconclusive AI review asks for a human" {
     not flagged 2
     did 1 assign "pr"
     did 1 comment "pr" contains "human"
+  }
+}
+
+test "An inconclusive AI review is not approved" {
+  given {
+    record 1 type "code_unit"
+    attr 1 "unit.llm_result" "unclear"
+  }
+
+  when rule "Auto-approve safe changes"
+
+  expect {
+    not flagged 1
   }
 }
 

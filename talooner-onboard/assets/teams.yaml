@@ -1,3 +1,6 @@
+# Only for `do require`. A user list works with private GitLab groups and needs
+# no host lookup; a GitHub team needs a PAT or App token. Keep this in sync with
+# `.talooner/onboarding.md`.
 owners: acme/owners
 senior:
   - alice

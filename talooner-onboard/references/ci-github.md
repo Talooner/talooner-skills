@@ -20,6 +20,19 @@ Write the result to `.github/workflows/talooner.yml`.
 
 Keep the snippet's `rules` → `review` → `resolve` structure.
 
+## Split ruleset
+
+When `.talooner/rules/*.tln` exists, the rules job joins them exactly like
+Talooner before testing:
+
+```yaml
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.1.2 .talooner/test-rules.sh
+```
+
+Keep the `pull_request_review` trigger (`types: [submitted]`) alongside
+`pull_request`: it re-runs the review after a human approval, which is what
+releases a sensitive PR.
+
 ## Run after the other checks
 
 `pr.checks_pending` is true while any check run or commit status on the head
