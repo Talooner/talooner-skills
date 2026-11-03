@@ -22,8 +22,19 @@ Add `talooner-rules` and `talooner-review` to `.gitlab-ci.yml`.
 
 ## Stages
 
-Choose `test` if it is declared. Otherwise use the last declared stage. If stages
-come only from an `include`, stop and give the user the two jobs to add by hand.
+`pr.checks_pending` counts the commit statuses on the merge request's head: the
+project's own CI jobs. A job in the same stage runs beside them, so the review
+starts while their statuses are pending and the base ruleset refuses to pass it.
+
+Put `talooner-review` after the check jobs:
+
+- the last declared stage, not `test` when the project's tests run there; or
+- if the pipeline already uses `needs:`, add every test/lint job to
+  `talooner-review`'s `needs` (`needs: [talooner-rules, test, lint]`).
+
+Keep `talooner-rules` a separate earlier job and keep
+`needs: [talooner-rules]` on the review. If stages come only from an `include`,
+stop and give the user the two jobs to add by hand.
 
 Preserve `stages`, `include`, `default` and unrelated jobs.
 

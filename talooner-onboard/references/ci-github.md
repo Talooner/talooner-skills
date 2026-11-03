@@ -20,6 +20,54 @@ Write the result to `.github/workflows/talooner.yml`.
 
 Keep the snippet's `rules` → `review` → `resolve` structure.
 
+## Run after the other checks
+
+`pr.checks_pending` is true while any check run or commit status on the head
+commit is still running, and the base strict ruleset refuses to approve a
+moving target. Nothing re-runs the review when CI finishes — GitHub does not
+deliver `check_suite` for check suites GitHub Actions created — so a review
+that starts with the push is blocked until someone pushes again or comments
+`!talooner /review`.
+
+The review job waits for the commit's other checks. Add `actions: read` to the
+review job's `permissions:`, and this step after `rules passed on the head
+commit` and before `id: talooner`:
+
+```yaml
+      - name: wait for the other checks on this commit
+        if: >-
+          github.event.action != 'closed' &&
+          (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .head.sha)
+          suite=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .check_suite_id)
+          for _ in $(seq 1 60); do
+            pending=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?per_page=100" \
+              --jq "[.check_runs[] | select(.status != \"completed\" and .check_suite.id != $suite)] | length")
+            statuses=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/status" \
+              --jq '[.statuses[] | select(.state == "pending")] | length')
+            if [ "$pending" -eq 0 ] && [ "$statuses" -eq 0 ]; then
+              echo "no checks pending on $sha"
+              exit 0
+            fi
+            echo "waiting on $pending check run(s) and $statuses status(es)"
+            sleep 10
+          done
+          echo "::warning::checks are still running on $sha after 10 minutes; reviewing without them"
+```
+
+The predicate excludes the run's own check suite by id, so `rules`, `review`,
+`resolve` and the `talooner` check run never count; everything the repository's
+CI started does. Ten minutes is the ceiling: past it the review runs anyway and
+the visible comment says to re-run with `!talooner /review`.
+
+The pinned 1.1.2 snippet predates this step. Add it when it is missing; a runner
+release that ships it will make the snippet correct on its own, but a generated
+workflow without a wait step is not ready.
+
 ## Environment
 
 Keep `TALOONER_LICENSE_KEY`, `TALOONER_CHECK_RUN_ID` and `GITHUB_TOKEN`.

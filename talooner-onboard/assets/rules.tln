@@ -36,7 +36,7 @@ rule "Oversized PR needs human review" {
 
 rule "CI checks still running" {
   for records where type == "pr" and attr "pr.checks_pending" == true
-  do comment "pr" "Waiting for required checks to finish."
+  do comment "pr" "Required checks are still running on this commit, so this review cannot pass yet. Run `!talooner /review` once they finish."
   reason "checks pending"
   priority LOW
 }

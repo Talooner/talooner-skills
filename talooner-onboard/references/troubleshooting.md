@@ -51,9 +51,11 @@ Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
   real forge token; do not call it ready before that passes.
 - Credentials exported in an interactive shell are invisible to the agent's
   shell. Put them in `~/.zshenv` or start the agent from that shell.
-- A check says "1 rule fired" but there is no comment — the base strict rule that
-  blocks while checks are pending has no comment action. Add a tenant rule that
-  comments on `pr.checks_pending == true`.
+- A check says "1 rule fired" and the PR is blocked on every push — the review
+  is racing the project's CI, so `pr.checks_pending` is true and the base rule
+  refuses to approve a moving target. Fix the ordering
+  (`references/ci-github.md`, `references/ci-gitlab.md`); a tenant rule that
+  comments on `pr.checks_pending == true` only makes the block visible.
 
 ## License
 
