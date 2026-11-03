@@ -32,6 +32,9 @@ Add the chosen model:
 - OpenAI-compatible: `TALOONER_MODEL_BASE_URL`, `TALOONER_MODEL`,
   `TALOONER_MODEL_API_KEY`.
 
+Use the provider's exact model id. Do not infer it from another provider's
+catalog; the runner's config check does not call the model.
+
 Add the decision model: `CDM_URL`, `CDM_TOKEN`, optional `CDM_MODEL`, optional
 `TALOONER_CDM_MIN_CONFIDENCE`.
 
@@ -67,6 +70,30 @@ Variables:
 A workflow run from a fork gets no secrets, so Talooner cannot review it. A
 member's `!talooner` comment can start a review. Comments from other authors are
 ignored.
+
+## Team review requests
+
+A team `do require` made with `GITHUB_TOKEN` fails with
+`POST /pulls/N/requested_reviewers: 422 Validation Failed`; the whole review run
+fails and the `talooner` check comes back neutral. Advice mode does not help
+because runtime errors still exit non-zero.
+
+Use `do assign "pr" attr "user.owner"` (with CODEOWNERS or a confirmed user) or a
+user target in `teams.yaml`. A team `do require` works with a PAT or GitHub App
+token that has organization team visibility. Requesting the same team by hand
+with a user token succeeds, so the slug and mapping can be correct and the
+Actions token still fails.
+
+## Verifying before the first PR
+
+Run the runner's config check with a real forge token, without printing it:
+
+```sh
+TALOONER_PROVIDER=github GITHUB_TOKEN="$(gh auth token)" \
+  "$SKILL_DIR/scripts/verify.sh" --repo "$PWD" --strict
+```
+
+`verify: INCOMPLETE` means config sanity was skipped; do not call it ready.
 
 ## Existing workflow
 

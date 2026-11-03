@@ -6,16 +6,16 @@ Full language reference: `https://tln-lang.org/`.
 
 ```tln
 define "critical_path" {
-  attr "pr.changed_files" contains "auth/"
+  attr "pr.changed_files" contains ".talooner/"
+    or attr "pr.changed_files" contains "auth/"
     or attr "pr.changed_files" contains "billing/"
 }
 
 rule "Critical path needs review" {
   for records where type == "pr" and is "critical_path"
-  requires "review.owners"
   do block "pr.merge"
-  do require "review.owners"
-  do comment "pr" "Changes a sensitive path; reviewer approval is required"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "Changes a sensitive path; the owner is assigned for review"
   reason "critical path"
   priority HIGH
 }
@@ -36,7 +36,15 @@ rule "Critical path needs review" {
 - `do assign "pr" attr "user.owner"` assigns the owner.
 - `do approve "pr"` approves the PR.
 
-Pair `requires` with `do block "pr.merge"` when the PR must wait.
+Pair `requires` with `do block "pr.merge"` when the PR must wait. If you use
+`do assign` instead of `do require`, drop `requires`; a rule that declares a
+review nobody requests is misleading. `verify.sh` rejects it.
+
+On GitHub Actions, a team review request made with `GITHUB_TOKEN` fails with a
+422. Use `do assign` or a user target there; team `do require` is for GitLab or a
+PAT/GitHub App. Assignment needs CODEOWNERS or a confirmed user: `user.owner` is
+unset for a new file with no last toucher, and the action then no-ops with
+`assignee_unresolved`.
 
 ## Matching
 
@@ -48,6 +56,18 @@ Pair `requires` with `do block "pr.merge"` when the PR must wait.
 - An unset fact is false. A positive condition on it does not fire. A negated
   condition on it does fire, so test the unset case.
 
+The base strict ruleset has a rule that blocks while required checks are still
+running. It has no comment action, so a run can say "1 rule fired" with nothing on
+the PR. Add a tenant comment:
+
+```tln
+rule "CI checks still running" {
+  for records where type == "pr" and attr "pr.checks_pending" == true
+  do comment "pr" "Waiting for required checks to finish."
+  priority LOW
+}
+```
+
 Do not write:
 
 - `strict` rules. The base ruleset already ships them; redefining one is a
@@ -57,12 +77,15 @@ Do not write:
   `tool "llm" "review"`.
 - A path substring without a trailing slash.
 - A `require` target with no mapping in `.talooner/teams.yaml`.
+- `requires "review.…"` without a matching `do require`.
+- A team `do require` on GitHub Actions with `GITHUB_TOKEN`.
 
 ## Facts
 
 - `pr.lines_changed`, `pr.files_changed`, `pr.changed_files`
 - `pr.draft`, `pr.has_description`, `pr.is_fork`, `pr.author`
 - `pr.tests_passing`, `pr.lint_passing` (unset until configured check names match)
+- `pr.checks_pending` (true while required checks are still running)
 - `pr.new_dependencies`
 - `user.owner` (CODEOWNERS, else the last person to touch the code)
 - `review.human.approved`, `review.changes_requested`, `review.<team>.approved`
@@ -166,7 +189,16 @@ Never delete a failing test to make the suite green. Fix the rule or ask the use
 - or `.talooner/rules/*.tln` with `.tln.test` next to each file
 - `.talooner/config.yaml` — `checks.tests` and `checks.lint` job names
 - `.talooner/teams.yaml` — logical team name to GitHub team, GitLab group, or user
-  list
+  list. Write it only when a rule uses `do require`:
+
+  ```yaml
+  owners: acme/owners
+  senior:
+    - alice
+    - bob
+  ```
+
+  `review.owners` resolves the `owners` key. A list needs no host lookup.
 - `.talooner/architecture.yaml` — folder, `kind` (`model`, `controller` or
   `service`), `doc_ref`
 - `.talooner/review.md` — repo-wide guidelines, under 16 KiB

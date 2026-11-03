@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   runner_version: 1.1.2
 ---
 
@@ -40,17 +40,21 @@ directory being the skill folder.
 ## Hard rules
 
 - This is interactive. Never run the whole flow automatically.
-- Ask one short question at a time and wait for the answer. Silence is not
-  consent.
+- Ask one question at a time and wait for the answer. Use one question object
+  per call; silence is not consent.
 - Never ask for, print, log, commit or pass a secret value. The user sets secrets
   in their shell or the CI UI.
 - Never write a secret to the repository.
+- Commit explicit paths only. Never use `git add -A` or `git add .`.
+- Never delete a branch you did not create in this run. List other branches and
+  let the user decide.
 - Never commit, push, open a PR/MR, change branch protection or install software
   without an explicit yes.
 - Work only in the repository root confirmed by `git rev-parse --show-toplevel`.
   If the working tree is dirty, stop and ask the user to commit or stash.
 - Do not read source files before the analysis-consent step.
-- Do not claim success until `"$SKILL_DIR/scripts/verify.sh"` passes.
+- Do not claim success until `"$SKILL_DIR/scripts/verify.sh" --strict` passes.
+  `verify: INCOMPLETE` means not ready.
 - Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.1.2`, never
   `latest`, for generated CI and local validation.
 - If a required prerequisite is missing, stop and explain how to get it; do not
@@ -65,11 +69,15 @@ Run:
 ```
 
 It prints the repo root, remote host, branch, clean/dirty state, existing
-Talooner files, CI files, tool availability, pinned image status, which
-credential names are present (never values), and the number of `.tln.test` files.
+Talooner files, existing CI, legacy Talooner files, target paths that the repo
+would ignore, tool availability, pinned image status, which credential names are
+present (never values), and the number of `.tln.test` files.
 
 Stop if the tree is dirty, Docker is missing, or the pinned image cannot run.
-Read `AGENTS.md` or `CLAUDE.md` if present, but do not modify them.
+If `legacy_talooner_files` is not `none`, read those files and plan a migration;
+do not create a parallel `.talooner/` ruleset. If `ignored_targets` is not `none`,
+plan the `.gitignore` negations before writing. Read `AGENTS.md` or `CLAUDE.md` if
+present, but do not modify them.
 
 No writes in this step.
 
@@ -118,6 +126,16 @@ Stop conditions:
 - Dirty tree.
 - Ambiguous remote.
 
+The agent's shell may not see variables exported in an interactive shell. Ask the
+user to put credentials in `~/.zshenv`, or start the agent from the shell that has
+them. Never print a value.
+
+Reviewer mapping: on GitHub Actions, a team review request made with
+`GITHUB_TOKEN` fails with a 422, so default to `do assign "pr" attr "user.owner"`
+when CODEOWNERS or a confirmed user exists. Use a team `do require` only on
+GitLab or with a PAT/GitHub App. Write `.talooner/teams.yaml` only when a rule
+actually uses `do require`.
+
 Run the license decode only after the user exports the key:
 
 ```sh
@@ -152,7 +170,8 @@ Write `.talooner/onboarding.md` in this shape:
 
 Changes here wait for a review before merge.
 
-- `billing/` — payments — reviewed by @acme/payments
+- `.talooner/` — the review policy — owner assigned for review
+- `billing/` — payments — owner assigned for review
 
 ## Extra rules
 
@@ -188,11 +207,14 @@ user confirmed, and adapt paths, reviewers and thresholds.
 Baseline rules, when they apply:
 
 - Block PRs with no description.
+- Always put `.talooner/` in the critical path: the policy file itself must not be
+  editable without review.
 - Critical-path review for each sensitive area: `do block "pr.merge"`,
-  `do require "review.<team>"`, `do comment "pr" "…"`, and
-  `do assign "pr" attr "user.owner"` only when CODEOWNERS exists or the user
-  confirmed a user.
+  `do assign "pr" attr "user.owner"` when CODEOWNERS or a confirmed user exists,
+  and `do comment "pr" "…"`. On GitLab, or with a PAT/GitHub App, you may use
+  `do require "review.<team>"` plus a `teams.yaml` mapping instead.
 - Oversized PR needs a human review, with boundary tests at the threshold.
+- Pending checks leave a visible comment (`pr.checks_pending == true`).
 - New dependencies need a security review, only if a manifest exists.
 - Migrations need a DBA review, only if migrations exist.
 - AI review inconclusive and AI review failed: require a human or comment. Never
@@ -209,6 +231,10 @@ Do not write:
 - `do llm_review`. Use an `enrich` block with `tool "llm" "review"`.
 - A path substring without a trailing slash.
 - A `require` target with no mapping in `.talooner/teams.yaml`.
+- `requires "review.…"` without a matching `do require`. A verdict on its own
+  requests nobody; `verify.sh` rejects it.
+- A team `do require` on GitHub Actions with `GITHUB_TOKEN`; it fails with a 422.
+  Use assignment or a user target.
 
 Tests:
 
@@ -272,7 +298,10 @@ GitHub Actions:
 - Keep the `rules` → `review` → `resolve` structure.
 - Rules use `ghcr.io/talooner/talooner-runner:1.1.2`; review uses
   `ghcr.io/talooner/talooner-runner:1.1.2-gh`.
-- Add the chosen model and decision-model env.
+- Add the chosen model and decision-model env. Use the provider's exact model id;
+  do not infer it from another provider's catalog.
+- Do not use a team `do require` with `GITHUB_TOKEN`; it fails with a 422. Use
+  `do assign` or a user target, unless the user supplies a PAT/GitHub App.
 - Add `TALOONER_ADVICE_MODE: "1"` when chosen.
 - Keep `TALOONER_LICENSE_KEY`, `TALOONER_CHECK_RUN_ID` and `GITHUB_TOKEN`.
 - Do not add `TALOONER_APPROVE_WITHOUT_RULESET`.
@@ -300,12 +329,23 @@ Details: `references/ci-github.md` and `references/ci-gitlab.md`.
 Run:
 
 ```sh
-"$SKILL_DIR/scripts/verify.sh" --repo "$PWD"
+"$SKILL_DIR/scripts/verify.sh" --repo "$PWD" --strict
 ```
 
-It checks the tree, required files, `tln test` with the pinned image, optional
-config sanity, CI wiring and token shapes, plus removed commands and local absolute
+It checks the tree, required files, ignored generated files, legacy Talooner
+paths, `requires`/`do require` pairing, `tln test` with the pinned image, config
+sanity, CI wiring and token shapes, plus removed commands and local absolute
 paths in the files it generated. It exits non-zero on any failure.
+
+`--strict` fails when config sanity is skipped. To run the real config check,
+supply the provider and a forge token without printing either:
+
+```sh
+TALOONER_PROVIDER=github GITHUB_TOKEN="$(gh auth token)" \
+  "$SKILL_DIR/scripts/verify.sh" --repo "$PWD" --strict
+```
+
+`verify: INCOMPLETE` means not ready.
 
 If a test fails, fix the rule or the test, or ask the user. Never delete a failing
 test to make the suite green.
@@ -360,7 +400,9 @@ the CI UI."
 
 - Show `git status` and `git diff` for the intended files.
 - Ask for explicit approval.
-- Create branch `talooner/onboard` unless the user chose another name.
+- Create branch `talooner/onboard` unless the user chose another name. Record
+  every branch you create.
+- Stage explicit paths only. Never `git add -A` or `git add .`.
 - Commit only the intended files; no `.env`, no secrets, no unrelated changes.
 - Ask before pushing.
 - If `gh` or `glab` is available and authenticated, open a draft PR/MR with:
@@ -373,6 +415,8 @@ the CI UI."
 - If the CLI is unavailable, print the push command and the PR/MR URL to open
   manually.
 - Offer "leave local only" at the confirmation step.
+- If the user asks for cleanup, delete only the branches this run created. List
+  every other Talooner-looking branch for the user to decide.
 
 ## Step 11 — handoff
 
@@ -387,6 +431,9 @@ Summarize:
 - How to leave advice mode and turn on blocking.
 - What the first review will show, and what it will not show on the onboarding
   PR.
+- The post-merge probe in `references/post-merge-check.md`: confirm
+  `.talooner/config.yaml` is on the base branch, open a throwaway PR touching a
+  sensitive path, check the comment, block and assignment, then close it.
 
 Links: `https://talooner.dev/rules/`, `https://talooner.dev/install/`,
 `https://tln-lang.org/`, `https://github.com/Talooner/feedback`.
@@ -398,6 +445,6 @@ Links: `https://talooner.dev/rules/`, `https://talooner.dev/install/`,
 - Analyze layout first, then only approved folders. Skip `vendor/`,
   `node_modules/`, `dist/`, `build/`, generated files, lockfiles and binaries.
 - Start rules and CI from templates; adapt rather than regenerate.
-- Ask one short question at a time.
+- Ask one question per call.
 - Summarize long files; never echo a whole file unless asked.
 - When something is ambiguous, ask instead of guessing.
