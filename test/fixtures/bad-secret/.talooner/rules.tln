@@ -1,5 +1,6 @@
 define "critical_path" {
-  attr "pr.changed_files" contains "auth/"
+  attr "pr.changed_files" contains ".talooner/"
+    or attr "pr.changed_files" contains "auth/"
     or attr "pr.changed_files" contains "billing/"
     or attr "pr.changed_files" contains "migrations/"
 }
@@ -17,22 +18,27 @@ rule "Block PRs with no description" {
 
 rule "Critical path needs review" {
   for records where type == "pr" and is "critical_path"
-  requires "review.owners"
   do block "pr.merge"
-  do require "review.owners"
-  do comment "pr" "Changes a sensitive path; reviewer approval is required"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "Changes a sensitive path; the owner is assigned for review"
   reason "critical path"
   priority HIGH
 }
 
 rule "Oversized PR needs human review" {
   for records where type == "pr" and attr "pr.lines_changed" >= 1500
-  requires "review.owners"
   do block "pr.merge"
-  do require "review.owners"
+  do assign "pr" attr "user.owner"
   do comment "pr" "Very large change; split it or ask for an explicit review"
   reason "oversized"
   priority HIGH
+}
+
+rule "CI checks still running" {
+  for records where type == "pr" and attr "pr.checks_pending" == true
+  do comment "pr" "Waiting for required checks to finish."
+  reason "checks pending"
+  priority LOW
 }
 
 enrich "cdm: how risky is this PR?" {
@@ -51,7 +57,7 @@ rule "Confident high risk needs a senior review" {
     and attr "pr.risk" == "high"
     and attr "pr.risk_certainty" >= 0.85
   do block "pr.merge"
-  do require "review.senior"
+  do assign "pr" attr "user.owner"
   do comment "pr" "The decision model rates this change high risk"
   priority HIGH
 }
@@ -72,5 +78,23 @@ rule "Confident vague description gets a comment" {
     and attr "pr.description_kind" == "vague"
     and attr "pr.description_certainty" >= 0.85
   do comment "pr" "The description says what changed but not why"
+  priority MEDIUM
+}
+
+rule "AI review was inconclusive" {
+  for records where type == "code_unit" and attr "unit.llm_result" == "unclear"
+  do block "pr.merge"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "The AI review could not decide on a changed unit; a human read is required"
+  reason "ai review inconclusive"
+  priority MEDIUM
+}
+
+rule "AI review failed" {
+  for records where type == "code_unit" and attr "unit.llm_result" == "error"
+  do block "pr.merge"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "The AI review failed on a changed unit; a human read is required"
+  reason "ai review failed"
   priority MEDIUM
 }
