@@ -220,6 +220,9 @@ if [ -n "$ci_gitlab" ]; then
   else
     ok "GitLab has no job named talooner"
   fi
+  if grep -q 'TALOONER_LICENSE_KEY' "$ci_gitlab"; then ok "GitLab license key is wired"; else bad "GitLab license key is not wired"; fi
+  if grep -Eq 'ANTHROPIC_API_KEY|OPENAI_API_KEY|TALOONER_MODEL_API_KEY|TALOONER_MODEL_BASE_URL' "$ci_gitlab"; then ok "GitLab model env is wired"; else bad "GitLab model env is not wired"; fi
+  if grep -q 'CDM_URL' "$ci_gitlab" && grep -q 'CDM_TOKEN' "$ci_gitlab"; then ok "GitLab decision-model env is wired"; else bad "GitLab decision-model env is not wired"; fi
 fi
 
 candidates=$(mktemp)
