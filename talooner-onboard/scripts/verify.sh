@@ -6,9 +6,11 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 RUNNER_IMAGE_GH="${RUNNER_IMAGE}-gh"
 
 repo=$PWD
+strict=no
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) repo=${2:-}; shift 2 ;;
+    --strict) strict=yes; shift ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -17,6 +19,7 @@ cd "$repo" 2>/dev/null || die "cannot enter $repo"
 git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git repository"
 
 fail=0
+skipped=0
 ok() { printf 'PASS %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fail=1; }
 
@@ -34,7 +37,7 @@ else
     path=${line#?? }
     path=${path#* -> }
     case "$path" in
-      .talooner/*|docs/guides/*|.github/workflows/talooner.yml|.github/workflows/talooner.yaml|.gitlab-ci.yml) ;;
+      .talooner/*|docs/guides/*|.github/workflows/talooner.yml|.github/workflows/talooner.yaml|.gitlab-ci.yml|.gitignore) ;;
       *) unexpected="$unexpected $path" ;;
     esac
   done <<EOF
@@ -44,6 +47,27 @@ EOF
     ok "working tree changes are limited to onboarding files"
   else
     bad "unexpected working tree changes:$unexpected"
+  fi
+fi
+
+staged=$(git diff --cached --name-only 2>/dev/null)
+if [ -z "$staged" ]; then
+  ok "no staged files outside the onboarding set"
+else
+  unexpected=
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    case "$path" in
+      .talooner/*|docs/guides/*|.github/workflows/talooner.yml|.github/workflows/talooner.yaml|.gitlab-ci.yml|.gitignore) ;;
+      *) unexpected="$unexpected $path" ;;
+    esac
+  done <<EOF
+$staged
+EOF
+  if [ -z "$unexpected" ]; then
+    ok "staged changes are limited to onboarding files"
+  else
+    bad "unexpected staged changes:$unexpected"
   fi
 fi
 
@@ -85,6 +109,55 @@ for f in .talooner/config.yaml .talooner/teams.yaml .talooner/architecture.yaml 
   fi
 done
 
+legacy=
+for f in .github/talooner/rules.tln .github/talooner/config.yaml .github/talooner/teams.yaml .github/talooner/architecture.yaml .github/talooner/review.md; do
+  [ -e "$f" ] && legacy="$legacy $f"
+done
+for f in .github/talooner/rules/*.tln; do [ -f "$f" ] && legacy="$legacy $f"; done
+if [ -z "$legacy" ]; then
+  ok "no legacy Talooner path"
+else
+  bad "legacy Talooner path present:$legacy - migrate it to .talooner/"
+fi
+
+rule_lint_ok=yes
+if [ -f .talooner/rules.tln ]; then
+  if ! lint_rule_requires < .talooner/rules.tln; then rule_lint_ok=no; fi
+fi
+for f in .talooner/rules/*.tln; do
+  [ -f "$f" ] || continue
+  if ! lint_rule_requires < "$f"; then rule_lint_ok=no; fi
+done
+if [ "$rule_lint_ok" = yes ]; then
+  ok "requires targets are requested with do require"
+else
+  bad "a rule declares requires without a matching do require"
+fi
+
+ignore_list=$(mktemp)
+{
+  [ -d .talooner ] && find .talooner -type f
+  [ -n "$ci_github" ] && printf '%s\n' "$ci_github"
+  [ -n "$ci_gitlab" ] && printf '%s\n' "$ci_gitlab"
+  [ -d docs/guides ] && find docs/guides -type f
+} | sort -u > "$ignore_list"
+ignored=0
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  if ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+    if git check-ignore -q "$f" 2>/dev/null; then
+      printf '  %s\n' "$f"
+      ignored=1
+    fi
+  fi
+done < "$ignore_list"
+rm -f "$ignore_list"
+if [ "$ignored" -eq 0 ]; then
+  ok "generated files are not ignored by git"
+else
+  bad "generated files are ignored by git; add negations to .gitignore"
+fi
+
 out=$(mktemp)
 if docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/repo" -w /repo --entrypoint tln \
@@ -118,7 +191,12 @@ if [ -n "$provider" ] && [ -n "$token" ]; then
   fi
   rm -f "$out"
 else
-  printf 'SKIP runner config sanity (provider or forge token not set)\n'
+  if [ "$strict" = yes ]; then
+    bad "runner config sanity (provider or forge token not set)"
+  else
+    printf 'SKIP runner config sanity (provider or forge token not set)\n'
+    skipped=1
+  fi
 fi
 
 if [ -n "$ci_github" ]; then
@@ -127,6 +205,8 @@ if [ -n "$ci_github" ]; then
   if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE_GH")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub review uses pinned -gh image"; else bad "GitHub review image is not $RUNNER_IMAGE_GH"; fi
   if grep -Eq -- "--entrypoint tln $(image_re "$RUNNER_IMAGE") test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi
   if grep -q 'TALOONER_LICENSE_KEY' "$ci_github"; then ok "GitHub license key is wired"; else bad "GitHub license key is not wired"; fi
+  if grep -Eq 'ANTHROPIC_API_KEY|OPENAI_API_KEY|TALOONER_MODEL_API_KEY|TALOONER_MODEL_BASE_URL' "$ci_github"; then ok "GitHub model env is wired"; else bad "GitHub model env is not wired"; fi
+  if grep -q 'CDM_URL' "$ci_github" && grep -q 'CDM_TOKEN' "$ci_github"; then ok "GitHub decision-model env is wired"; else bad "GitHub decision-model env is not wired"; fi
 fi
 
 if [ -n "$ci_gitlab" ]; then
@@ -182,7 +262,11 @@ if [ "$copy" -eq 0 ]; then ok "no removed commands or setup phrases"; else bad "
 if [ "$localpath" -eq 0 ]; then ok "no local absolute paths"; else bad "local absolute paths in onboarding files"; fi
 
 if [ "$fail" -eq 0 ]; then
-  printf 'verify: PASS\n'
+  if [ "$skipped" -eq 0 ]; then
+    printf 'verify: PASS\n'
+  else
+    printf 'verify: INCOMPLETE (config sanity skipped; rerun with --strict and a real forge token)\n'
+  fi
   exit 0
 fi
 printf 'verify: FAIL\n'

@@ -53,6 +53,48 @@ print("TLN1.%s.%s" % (payload, "signature"))' "$1" "$2"
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/clean-repo"
 expect_verify clean-repo "$TMP/clean-repo" 0
 
+out="$TMP/clean-repo.incomplete"
+if "$VERIFY" --repo "$TMP/clean-repo" >"$out" 2>&1 && grep -q '^verify: INCOMPLETE' "$out"; then
+  pass "verify reports INCOMPLETE without credentials"
+else
+  cat "$out"
+  bad "verify reports INCOMPLETE without credentials"
+fi
+
+if "$VERIFY" --repo "$TMP/clean-repo" --strict >/dev/null 2>&1; then
+  bad "verify --strict fails without credentials"
+else
+  pass "verify --strict fails without credentials"
+fi
+
+mkdir -p "$TMP/ignored-config"
+printf '*.test\nconfig.yaml\n' > "$TMP/ignored-config/.gitignore"
+cp -R "$ROOT/test/fixtures/clean-repo/." "$TMP/ignored-config/"
+git -C "$TMP/ignored-config" init -q
+git -C "$TMP/ignored-config" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/ignored-config" -c user.name=fixture -c user.email=fixture@example.com commit -qm init
+expect_verify ignored-config "$TMP/ignored-config" 1
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/legacy-rules"
+mkdir -p "$TMP/legacy-rules/.github/talooner"
+cp "$ROOT/test/fixtures/clean-repo/.talooner/rules.tln" "$TMP/legacy-rules/.github/talooner/rules.tln"
+git -C "$TMP/legacy-rules" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/legacy-rules" -c user.name=fixture -c user.email=fixture@example.com commit -qm legacy
+expect_verify legacy-rules "$TMP/legacy-rules" 1
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/requires-without-require"
+cat >> "$TMP/requires-without-require/.talooner/rules.tln" <<'TLN'
+
+rule "Bad require" {
+  for records where type == "pr"
+  requires "review.owners"
+  do block "pr.merge"
+}
+TLN
+git -C "$TMP/requires-without-require" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/requires-without-require" -c user.name=fixture -c user.email=fixture@example.com commit -qm bad-require
+expect_verify requires-without-require "$TMP/requires-without-require" 1
+
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/existing-guides"
 mkdir -p "$TMP/existing-guides/docs/guides"
 cat > "$TMP/existing-guides/docs/guides/deploy.md" <<'MD'
@@ -143,15 +185,23 @@ TALOONER_LICENSE_KEY="TLN1.not-base64.signature" "$DECODE" >/dev/null 2>&1
 if [ $? -eq 2 ]; then pass "decode malformed key"; else bad "decode malformed key"; fi
 
 cp -R "$SKILL" "$TMP/installed-skill"
-mkdir -p "$TMP/doctor-repo"
-git -C "$TMP/doctor-repo" init -q
+mkdir -p "$TMP/doctor-repo/.github/workflows" "$TMP/doctor-repo/.github/talooner"
 printf '# target\n' > "$TMP/doctor-repo/README.md"
+printf 'name: ci\n' > "$TMP/doctor-repo/.github/workflows/ci.yml"
+printf 'rule "legacy" { for records where type == "pr" do comment "pr" "x" }\n' > "$TMP/doctor-repo/.github/talooner/rules.tln"
+printf 'config.yaml\n' > "$TMP/doctor-repo/.gitignore"
+git -C "$TMP/doctor-repo" init -q
 git -C "$TMP/doctor-repo" -c user.name=fixture -c user.email=fixture@example.com add -A
 git -C "$TMP/doctor-repo" -c user.name=fixture -c user.email=fixture@example.com commit -qm init
-if ( cd "$TMP/doctor-repo" && "$TMP/installed-skill/scripts/doctor.sh" --repo "$TMP/doctor-repo" >/dev/null 2>&1 ); then
-  pass "doctor runs from an unrelated cwd"
+doctor_out="$TMP/doctor.out"
+if ( cd "$TMP/doctor-repo" && "$TMP/installed-skill/scripts/doctor.sh" --repo "$TMP/doctor-repo" >"$doctor_out" 2>&1 ) \
+  && grep -q 'legacy_talooner_files=.*\.github/talooner/rules\.tln' "$doctor_out" \
+  && grep -q 'ignored_targets=.*\.talooner/config\.yaml' "$doctor_out" \
+  && grep -q 'existing_ci_files=.*\.github/workflows/ci\.yml' "$doctor_out"; then
+  pass "doctor runs from an unrelated cwd and reports legacy, ignored and existing CI"
 else
-  bad "doctor runs from an unrelated cwd"
+  cat "$doctor_out"
+  bad "doctor reports legacy, ignored and existing CI"
 fi
 
 if [ "$fail" -eq 0 ]; then

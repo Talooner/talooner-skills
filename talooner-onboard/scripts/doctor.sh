@@ -52,6 +52,28 @@ for f in .github/workflows/talooner.yml .github/workflows/talooner.yaml .gitlab-
 done
 printf '%s\n' "${found:-none}"
 
+printf 'existing_ci_files='
+found=
+for f in .github/workflows/*.yml .github/workflows/*.yaml .gitlab-ci.yml; do
+  [ -f "$f" ] && found="$found $f"
+done
+printf '%s\n' "${found:-none}"
+
+printf 'legacy_talooner_files='
+found=
+for f in .github/talooner/rules.tln .github/talooner/config.yaml .github/talooner/teams.yaml .github/talooner/architecture.yaml .github/talooner/review.md; do
+  [ -f "$f" ] && found="$found $f"
+done
+for f in .github/talooner/rules/*.tln; do [ -f "$f" ] && found="$found $f"; done
+printf '%s\n' "${found:-none}"
+
+printf 'ignored_targets='
+found=
+for f in .talooner/onboarding.md .talooner/rules.tln .talooner/rules.tln.test .talooner/config.yaml .talooner/teams.yaml .talooner/architecture.yaml .talooner/review.md .github/workflows/talooner.yml docs/guides/example.md; do
+  if git check-ignore -q --no-index "$f" 2>/dev/null; then found="$found $f"; fi
+done
+printf '%s\n' "${found:-none}"
+
 for cmd in git docker gh glab; do
   if command -v "$cmd" >/dev/null 2>&1; then printf '%s=yes\n' "$cmd"; else printf '%s=no\n' "$cmd"; fi
 done
