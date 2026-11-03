@@ -149,6 +149,41 @@ git -C "$TMP/bad-ci" -c user.name=fixture -c user.email=fixture@example.com add 
 git -C "$TMP/bad-ci" -c user.name=fixture -c user.email=fixture@example.com commit -qm bad-ci
 expect_verify bad-ci "$TMP/bad-ci" 1
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-ci"
+rm -f "$TMP/gitlab-ci/.github/workflows/talooner.yml"
+cat > "$TMP/gitlab-ci.yml" <<'YAML'
+talooner-rules:
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.1.2
+    entrypoint: [""]
+  script:
+    - tln test .talooner/
+
+talooner-review:
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.1.2-gh
+    entrypoint: [""]
+  needs: [talooner-rules]
+  script:
+    - talooner review
+  variables:
+    TALOONER_LICENSE_KEY: $TALOONER_LICENSE_KEY
+    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+    CDM_URL: $CDM_URL
+    CDM_TOKEN: $CDM_TOKEN
+YAML
+cp "$TMP/gitlab-ci.yml" "$TMP/gitlab-ci/.gitlab-ci.yml"
+git -C "$TMP/gitlab-ci" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/gitlab-ci" -c user.name=fixture -c user.email=fixture@example.com commit -qm gitlab-ci
+expect_verify gitlab-ci "$TMP/gitlab-ci" 0
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-missing-model"
+rm -f "$TMP/gitlab-missing-model/.github/workflows/talooner.yml"
+grep -Ev 'ANTHROPIC_API_KEY|CDM_' "$TMP/gitlab-ci.yml" > "$TMP/gitlab-missing-model/.gitlab-ci.yml"
+git -C "$TMP/gitlab-missing-model" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/gitlab-missing-model" -c user.name=fixture -c user.email=fixture@example.com commit -qm gitlab-missing-model
+expect_verify gitlab-missing-model "$TMP/gitlab-missing-model" 1
+
 key=$(make_key 86400 "ai_review")
 out=$(TALOONER_LICENSE_KEY="$key" "$DECODE" 2>/dev/null) && rc=0 || rc=$?
 if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q '^ai_review=yes$' && printf '%s' "$out" | grep -q '^expired=no$'; then
