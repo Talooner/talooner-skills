@@ -20,6 +20,10 @@ fail=0
 ok() { printf 'PASS %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fail=1; }
 
+image_re() {
+  printf '%s' "$1" | sed 's/[.[\*^$/]/\\&/g'
+}
+
 dirty=$(git status --porcelain 2>/dev/null)
 if [ -z "$dirty" ]; then
   ok "working tree is clean"
@@ -120,8 +124,8 @@ fi
 if [ -n "$ci_github" ]; then
   if grep -Eq '^  rules:' "$ci_github"; then ok "GitHub rules job"; else bad "GitHub rules job missing"; fi
   if grep -Eq '^  review:' "$ci_github"; then ok "GitHub review job"; else bad "GitHub review job missing"; fi
-  if grep -q "docker://$RUNNER_IMAGE_GH" "$ci_github"; then ok "GitHub review uses pinned -gh image"; else bad "GitHub review image is not $RUNNER_IMAGE_GH"; fi
-  if grep -q -- "--entrypoint tln $RUNNER_IMAGE test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi
+  if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE_GH")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub review uses pinned -gh image"; else bad "GitHub review image is not $RUNNER_IMAGE_GH"; fi
+  if grep -Eq -- "--entrypoint tln $(image_re "$RUNNER_IMAGE") test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi
   if grep -q 'TALOONER_LICENSE_KEY' "$ci_github"; then ok "GitHub license key is wired"; else bad "GitHub license key is not wired"; fi
 fi
 
@@ -130,7 +134,7 @@ if [ -n "$ci_gitlab" ]; then
   if grep -Eq '^talooner-review:' "$ci_gitlab"; then ok "GitLab review job"; else bad "GitLab review job missing"; fi
   if grep -q 'entrypoint: \[""\]' "$ci_gitlab"; then ok "GitLab entrypoint is empty"; else bad "GitLab entrypoint is not empty"; fi
   if grep -Eq 'needs: \[talooner-rules\]' "$ci_gitlab"; then ok "GitLab review needs rules"; else bad "GitLab review does not need talooner-rules"; fi
-  if grep -q "$RUNNER_IMAGE" "$ci_gitlab"; then ok "GitLab uses pinned image"; else bad "GitLab does not use $RUNNER_IMAGE"; fi
+  if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE")([^0-9A-Za-z._-]|$)" "$ci_gitlab"; then ok "GitLab uses pinned image"; else bad "GitLab does not use $RUNNER_IMAGE"; fi
   if grep -Eq '^talooner:' "$ci_gitlab"; then
     bad "GitLab has a job named talooner"
   else
@@ -139,15 +143,18 @@ if [ -n "$ci_gitlab" ]; then
 fi
 
 candidates=$(mktemp)
+generated=$(mktemp)
 {
   [ -d .talooner ] && find .talooner -type f
   [ -n "$ci_github" ] && printf '%s\n' "$ci_github"
   [ -n "$ci_gitlab" ] && printf '%s\n' "$ci_gitlab"
+} | sort -u > "$generated"
+{
+  cat "$generated"
   [ -d docs/guides ] && find docs/guides -type f
 } | sort -u > "$candidates"
 
 secrets=0
-private=0
 copy=0
 localpath=0
 while IFS= read -r f; do
@@ -156,10 +163,9 @@ while IFS= read -r f; do
     printf '  %s\n' "$f"
     secrets=1
   fi
-  if ! private_paths_match < "$f"; then
-    printf '  %s\n' "$f"
-    private=1
-  fi
+done < "$candidates"
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
   if ! removed_copy_match < "$f"; then
     printf '  %s\n' "$f"
     copy=1
@@ -168,11 +174,10 @@ while IFS= read -r f; do
     printf '  %s\n' "$f"
     localpath=1
   fi
-done < "$candidates"
-rm -f "$candidates"
+done < "$generated"
+rm -f "$candidates" "$generated"
 
 if [ "$secrets" -eq 0 ]; then ok "no token shapes in onboarding files"; else bad "token shapes in onboarding files"; fi
-if [ "$private" -eq 0 ]; then ok "no private paths in onboarding files"; else bad "private paths in onboarding files"; fi
 if [ "$copy" -eq 0 ]; then ok "no removed commands or setup phrases"; else bad "removed commands or setup phrases in onboarding files"; fi
 if [ "$localpath" -eq 0 ]; then ok "no local absolute paths"; else bad "local absolute paths in onboarding files"; fi
 

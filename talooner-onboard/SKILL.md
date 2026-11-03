@@ -305,8 +305,8 @@ Run:
 ```
 
 It checks the tree, required files, `tln test` with the pinned image, optional
-config sanity, CI wiring, token shapes, private paths, removed commands and local
-absolute paths. It exits non-zero on any failure.
+config sanity, CI wiring and token shapes, plus removed commands and local absolute
+paths in the files it generated. It exits non-zero on any failure.
 
 If a test fails, fix the rule or the test, or ask the user. Never delete a failing
 test to make the suite green.

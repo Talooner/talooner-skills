@@ -4,6 +4,20 @@ set -uo pipefail
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/talooner-onboard/scripts/common.sh"
 
+private_paths_match() {
+  perl -0777 -ne '
+    my $t = $_;
+    $t =~ s{(?:https?://)?ghcr\.io/talooner/talooner-runner(?::[A-Za-z0-9._-]+)?}{ALLOWED_IMAGE}g;
+    $t =~ s{(?:https?://)?github\.com/Talooner/talooner-skills(?:\.git)?(?:[/?#][^\s]*)?}{ALLOWED_SKILLS}g;
+    if ($t =~ m{(?:https?://)?github\.com/[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)} ||
+        $t =~ m{\b[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)}) {
+      print "forbidden private path\n";
+      exit 1;
+    }
+    exit 0;
+  '
+}
+
 fail=0
 ok() { printf 'PASS %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; fail=1; }

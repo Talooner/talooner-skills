@@ -24,20 +24,6 @@ absolute_dir() {
   CDPATH='' cd -- "$1" && pwd
 }
 
-private_paths_match() {
-  perl -0777 -ne '
-    my $t = $_;
-    $t =~ s{(?:https?://)?ghcr\.io/talooner/talooner-runner(?::[A-Za-z0-9._-]+)?}{ALLOWED_IMAGE}g;
-    $t =~ s{(?:https?://)?github\.com/Talooner/talooner-skills(?:\.git)?(?:[/?#][^\s]*)?}{ALLOWED_SKILLS}g;
-    if ($t =~ m{(?:https?://)?github\.com/[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)} ||
-        $t =~ m{\b[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)}) {
-      print "forbidden private path\n";
-      exit 1;
-    }
-    exit 0;
-  '
-}
-
 secret_shapes_match() {
   perl -0777 -ne '
     my @p = (

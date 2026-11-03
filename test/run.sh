@@ -53,6 +53,23 @@ print("TLN1.%s.%s" % (payload, "signature"))' "$1" "$2"
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/clean-repo"
 expect_verify clean-repo "$TMP/clean-repo" 0
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/existing-guides"
+mkdir -p "$TMP/existing-guides/docs/guides"
+cat > "$TMP/existing-guides/docs/guides/deploy.md" <<'MD'
+# Deploy in one command
+
+Run it from `/Users/you/project`.
+MD
+git -C "$TMP/existing-guides" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/existing-guides" -c user.name=fixture -c user.email=fixture@example.com commit -qm guides
+expect_verify existing-guides "$TMP/existing-guides" 0
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/stale-generated"
+printf 'one command to onboard\n' > "$TMP/stale-generated/.talooner/notes.md"
+git -C "$TMP/stale-generated" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/stale-generated" -c user.name=fixture -c user.email=fixture@example.com commit -qm notes
+expect_verify stale-generated "$TMP/stale-generated" 1
+
 make_repo "$ROOT/test/fixtures/dirty-repo" "$TMP/dirty-repo"
 printf '\nchanged\n' >> "$TMP/dirty-repo/app/main.go"
 expect_verify dirty-repo "$TMP/dirty-repo" 1
