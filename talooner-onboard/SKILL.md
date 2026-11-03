@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   runner_version: 1.1.2
 ---
 
@@ -118,7 +118,7 @@ Follow `references/interview.md`. The order:
 8. Auto-approve.
 9. Reviewer mapping.
 10. Check names.
-11. Guides.
+11. AI review units and guides.
 12. Repo-wide guidelines.
 13. PR and commit choices.
 14. Anything else.
@@ -190,6 +190,11 @@ on — provider: <anthropic|openai|openai-compatible>, model: <id>
 
 on — SubQ Snap (or Jev)
 
+## AI review units
+
+- `app/` — no guide
+- `billing/` — docs/guides/payments.md
+
 ## Guides
 
 - `billing/` — docs/guides/payments.md
@@ -258,13 +263,24 @@ existing names. Never delete or rename a rule without explicit approval. If
 
 Syntax reference: `references/tln-rules.md`.
 
-## Step 6 — write guides
+## Step 6 — write AI review units and guides
 
-Only for folders the user approved.
+Always write `.talooner/architecture.yaml`, even when the user chose no guides.
+It is not a docs index: it is what turns AI review on. With no architecture rule
+at all, Talooner sends no `code_units`, so `llm_review` never reads the change and
+no inline comment can ever be posted, however many rules the repo has.
 
-Write `.talooner/architecture.yaml`:
+Write one entry per top-level code root the analysis found — `src/`, `lib/`,
+`app/`, `internal/`, `pkg/`, `services/` and so on — not only the sensitive ones.
+Without an entry, a folder is invisible to AI review: it is neither a code unit
+nor a place an inline comment can land. `kind` is required; `doc_ref` is only for
+a folder the user interviewed:
 
 ```yaml
+- path: internal/
+  kind: service
+- path: pkg/
+  kind: service
 - path: app/services/payments/
   kind: service
   doc_ref: docs/guides/payments.md
@@ -272,7 +288,7 @@ Write `.talooner/architecture.yaml`:
 
 `kind` is `model`, `controller` or `service`.
 
-Write or extend one guide per folder:
+Only folders with a `doc_ref` need a guide. Write or extend that guide:
 
 - One `###` section per checkable rule; the heading names the rule.
 - Concrete: a call, a check, a name, a number.
@@ -437,6 +453,8 @@ the CI UI."
 Summarize:
 
 - Each rule in one line.
+- Each `architecture.yaml` entry in one line: the code an inline comment can
+  land on. Name the code roots with no entry, and say they get no AI review.
 - Each guide in one line: code covered, number of sections and spec cases,
   current-code violations found.
 - CI file and jobs.
@@ -446,8 +464,9 @@ Summarize:
 - What the first review will show, and what it will not show on the onboarding
   PR.
 - The post-merge probe in `references/post-merge-check.md`: confirm
-  `.talooner/config.yaml` is on the base branch, open a throwaway PR touching a
-  sensitive path, check the comment, block and assignment, then close it.
+  `.talooner/config.yaml` and `.talooner/architecture.yaml` are on the base
+  branch, open a throwaway PR touching a sensitive path and a mapped code root,
+  check the comment, block, assignment and `code units resolved`, then close it.
 
 Links: `https://talooner.dev/rules/`, `https://talooner.dev/install/`,
 `https://tln-lang.org/`, `https://github.com/Talooner/feedback`.

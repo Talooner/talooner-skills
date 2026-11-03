@@ -103,11 +103,17 @@ else
   bad "missing .github/workflows/talooner.yml or .gitlab-ci.yml"
 fi
 
-for f in .talooner/config.yaml .talooner/teams.yaml .talooner/architecture.yaml .talooner/review.md; do
+for f in .talooner/config.yaml .talooner/teams.yaml .talooner/review.md; do
   if [ -f "$f" ]; then
     ok "optional file exists: $f"
   fi
 done
+
+if [ -f .talooner/architecture.yaml ]; then
+  ok "architecture.yaml exists"
+else
+  bad "missing .talooner/architecture.yaml: with no architecture rule Talooner sends no code units, so AI review never runs and no inline comment can be posted"
+fi
 
 legacy=
 for f in .github/talooner/rules.tln .github/talooner/config.yaml .github/talooner/teams.yaml .github/talooner/architecture.yaml .github/talooner/review.md; do

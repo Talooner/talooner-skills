@@ -1,3 +1,5 @@
+- path: app/
+  kind: service
 - path: billing/
   kind: service
   doc_ref: docs/guides/payments.md

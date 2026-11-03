@@ -81,7 +81,8 @@ argument.
 - `.talooner/rules.tln` and `.talooner/rules.tln.test`
 - `.talooner/config.yaml` when check names are confirmed
 - `.talooner/teams.yaml` when reviewers are mapped
-- `.talooner/architecture.yaml` and `docs/guides/*.md` when guides are selected
+- `.talooner/architecture.yaml` — the code AI review reads, one entry per code root
+- `docs/guides/*.md` when guides are selected
 - `.talooner/review.md` when there are repo-wide guidelines
 - `.github/workflows/talooner.yml` or Talooner jobs in `.gitlab-ci.yml`
 

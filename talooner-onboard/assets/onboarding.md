@@ -21,6 +21,11 @@ on — provider: anthropic, model: claude-sonnet-5-5
 
 on — SubQ Snap
 
+## AI review units
+
+- `app/` — no guide
+- `billing/` — docs/guides/payments.md
+
 ## Guides
 
 - `billing/` — docs/guides/payments.md
