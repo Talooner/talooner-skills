@@ -8,8 +8,9 @@ are suggestions, not answers.
 Say: "I will check the repository first. Nothing is written in this step."
 
 Run `scripts/doctor.sh` from the repository root. Report the repo, remote host,
-branch, clean/dirty state, existing Talooner files, CI files, Docker and pinned
-image status, and which credential names are present. Never print a value.
+branch, clean/dirty state, existing Talooner files, existing CI, legacy Talooner
+files, ignored target paths, Docker and pinned image status, and which credential
+names are present. Never print a value.
 
 Stop conditions:
 
@@ -17,6 +18,14 @@ Stop conditions:
 - The working tree is dirty. Ask the user to commit or stash.
 - Docker is missing or the pinned image cannot run.
 - The remote is ambiguous. Ask instead of guessing.
+
+If `legacy_talooner_files` is not `none`, read them before writing anything and
+plan a migration. Do not create a parallel `.talooner/` ruleset.
+
+If `ignored_targets` is not `none`, plan precise `.gitignore` negations for those
+paths. A generated file that git ignores never reaches CI.
+
+Read `AGENTS.md` or `CLAUDE.md` if present, but do not modify them.
 
 ## 1. Scope and consent
 
@@ -66,6 +75,10 @@ Yes:
 
 Stop until the user confirms the current key includes AI review.
 
+The agent's shell may not see a variable exported in an interactive shell. Ask the
+user to put credentials in `~/.zshenv` or start the agent from that shell. Check
+presence only; never print a value.
+
 ## 3. AI review provider
 
 Question: "Which model provider should AI review use?"
@@ -75,6 +88,8 @@ Question: "Which model provider should AI review use?"
 - OpenAI-compatible: `TALOONER_MODEL_BASE_URL`, `TALOONER_MODEL`,
   `TALOONER_MODEL_API_KEY`.
 
+Ask for the provider's exact model id. Do not infer it from another provider's
+catalog, and do not assume the config sanity check calls the model; it does not.
 Ask the user to export the key in the shell. Do not take the value in chat.
 Explain that the provider bills the calls, not Talooner. Stop if no key is
 present.
@@ -98,6 +113,8 @@ Say what was detected.
 
 - **GitHub Actions** supplies `GITHUB_TOKEN`; no new secret. The repository
   setting "Allow GitHub Actions to create and approve pull requests" must be on.
+  A team review request with `GITHUB_TOKEN` fails with a 422; use `do assign` or a
+  user target unless the user supplies a PAT/GitHub App.
 - **GitLab** needs a project or group access token with the Developer role and
   the `api` scope, stored as a masked `GITLAB_TOKEN` CI/CD variable. Do not ask
   for the value.
@@ -115,9 +132,12 @@ Default yes.
 
 ## 7. Sensitive paths
 
-Propose paths from folder layout and CODEOWNERS: auth and permissions, payments
-and billing, migrations, deploy and infrastructure, CI, secrets, public APIs,
-data deletion.
+Propose paths from folder layout and CODEOWNERS: `.talooner/` (always), auth and
+permissions, payments and billing, migrations, deploy and infrastructure, CI,
+secrets, public APIs, data deletion.
+
+`.talooner/` is the policy itself. A PR author must not be able to edit the rules
+that judge the PR without another person reviewing it.
 
 For each, ask:
 
@@ -127,8 +147,11 @@ For each, ask:
 
 Confirm, drop or add. Never invent a business rule.
 
-If there is no CODEOWNERS and no team mapping, use a real user target or leave the
-rule out.
+If there is no CODEOWNERS and no team mapping, do not use
+`do assign "pr" attr "user.owner"`; it resolves to nobody on a new file. Use a
+confirmed user target, or leave the assignment out and keep the block and comment.
+A team `do require` is for GitLab or a PAT/GitHub App, not GitHub Actions'
+`GITHUB_TOKEN`.
 
 ## 8. Extra rules
 
@@ -158,6 +181,11 @@ Ask the user to confirm. Write `.talooner/config.yaml` only with confirmed names
 If unsure, leave the section commented. Then `pr.tests_passing` and
 `pr.lint_passing` stay unset, so auto-approve never fires.
 
+Before committing, run `git check-ignore -v .talooner/config.yaml`. A bare
+`config.yaml` credential rule matches it at any depth; add
+`!.talooner/config.yaml` after that rule. The same trap applies to
+`.talooner/rules.tln.test` when the repo ignores `*.test`.
+
 ## 11. Guides
 
 Propose candidate folders from the approved analysis, not just sensitive ones.
@@ -179,6 +207,11 @@ against the current code and report violations; do not fix them silently.
 Ask for concrete rules that apply to every review. Write `.talooner/review.md`
 only when there are real guidelines, and keep it under 16 KiB.
 
+If a guideline contradicts the current code (for example "no comments in source"
+in a repository full of comments), report the contradiction and ask whether to
+keep it as advice, reword it, or drop it. Do not ship a blocking guideline the
+codebase already violates.
+
 ## 13. PR and commit
 
 Ask:
@@ -188,6 +221,17 @@ Ask:
 - Commit message.
 - Leave it local only, or push after approval?
 
+Stage explicit paths only. Never use `git add -A` or `git add .`. Record every
+branch this run creates; if cleanup is requested, delete only those and list the
+others for the user.
+
 ## 14. Anything else
 
 Ask whether there is anything else Talooner should know.
+
+## After the PR
+
+After merge, follow `references/post-merge-check.md`. Confirm
+`.talooner/config.yaml` reached the base branch, then open a throwaway PR touching
+a sensitive path and check the comment, block and assignment. Close it without
+merging.

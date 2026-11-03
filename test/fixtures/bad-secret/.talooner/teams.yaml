@@ -1,2 +1,4 @@
 owners: acme/owners
-senior: acme/senior
+senior:
+  - alice
+  - bob

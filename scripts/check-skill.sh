@@ -95,6 +95,18 @@ for d in references scripts assets; do
   if [ -d "$skill/$d" ]; then ok "folder exists: $d/"; else bad "folder missing: $d/"; fi
 done
 
+if lint_rule_requires < "$skill/assets/rules.tln"; then
+  ok "starter rules pair requires with do require"
+else
+  bad "starter rules use requires without do require"
+fi
+
+if grep -Fq 'contains ".talooner/"' "$skill/assets/rules.tln"; then
+  ok "starter rules protect .talooner/"
+else
+  bad "starter rules do not protect .talooner/"
+fi
+
 expect_private_clean "https://github.com/Talooner/talooner-skills"
 expect_private_clean "github.com/Talooner/talooner-skills.git"
 expect_private_clean "ghcr.io/talooner/talooner-runner:1.1.2"

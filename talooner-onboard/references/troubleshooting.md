@@ -18,6 +18,43 @@
 - A split ruleset shares `define`s across files — `tln test .talooner/` tests each
   file on its own. Keep shared definitions in a file that starts with `_`.
 
+## Generated files are ignored
+
+- `.talooner/config.yaml` is missing from CI — a bare `config.yaml` pattern in
+  `.gitignore` matches it at any depth. Add `!.talooner/config.yaml` after that
+  pattern.
+- `.talooner/rules.tln.test` is missing — a `*.test` pattern (for Go test
+  binaries) matches it. Add `!.talooner/*.tln.test`.
+- `verify.sh` reports "generated files are ignored by git"; fix the negation and
+  rerun. A file that only exists on disk never reaches CI.
+
+## Legacy Talooner path
+
+`verify.sh` reports a legacy `.github/talooner/` path. The runtime still reads it,
+but only when `.talooner/` is absent; a parallel ruleset makes the two disagree.
+Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
+`legacy_talooner_files` before anything is written.
+
+## Review requests
+
+- `POST /pulls/N/requested_reviewers: 422` on GitHub Actions — `GITHUB_TOKEN`
+  cannot request a team review. Use `do assign` or a user target; use a
+  PAT/GitHub App for a team.
+- `assignee_unresolved` — `user.owner` is unset for a new file with no CODEOWNERS
+  and no last toucher. Add CODEOWNERS or use a confirmed user.
+- `requires "review.…"` without `do require` — the verdict requests nobody.
+  Remove `requires`, or add the matching `do require`.
+
+## Readiness
+
+- `verify: INCOMPLETE` — config sanity was skipped. Rerun with `--strict` and a
+  real forge token; do not call it ready before that passes.
+- Credentials exported in an interactive shell are invisible to the agent's
+  shell. Put them in `~/.zshenv` or start the agent from that shell.
+- A check says "1 rule fired" but there is no comment — the base strict rule that
+  blocks while checks are pending has no comment action. Add a tenant rule that
+  comments on `pr.checks_pending == true`.
+
 ## License
 
 - `TALOONER_LICENSE_KEY is not set` — set the masked variable. Protected variables
@@ -47,6 +84,8 @@
 - `pr.tests_passing` never true — set the real check names in
   `.talooner/config.yaml`.
 - The check is advisory — remove `TALOONER_ADVICE_MODE` to block.
+- The model id looks wrong only on the first real PR — config sanity does not call
+  the model. Use the provider's exact id.
 - No review on the onboarding PR — the base branch has no ruleset yet. Merge
   first, then open a small test PR.
 

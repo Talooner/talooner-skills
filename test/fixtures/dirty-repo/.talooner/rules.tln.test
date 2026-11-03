@@ -33,26 +33,34 @@ test "A draft with no description is left alone" {
   }
 }
 
-test "A sensitive path needs its reviewer" {
+test "A sensitive path assigns its reviewer" {
   given {
     record 1 type "pr"
-    attr 1 "pr.changed_files" ["internal/auth/session.go"]
+    attr 1 "pr.changed_files" [".talooner/rules.tln"]
 
     record 2 type "pr"
-    attr 2 "pr.changed_files" ["README.md"]
+    attr 2 "pr.changed_files" ["internal/auth/session.go"]
 
     record 3 type "pr"
-    attr 3 "pr.changed_files" ["src/authorization/roles.go"]
+    attr 3 "pr.changed_files" ["README.md"]
+
+    record 4 type "pr"
+    attr 4 "pr.changed_files" ["src/authorization/roles.go"]
+
+    record 5 type "pr"
+    attr 5 "pr.changed_files" [".talooner-bak/rules.tln"]
   }
 
   when rule "Critical path needs review"
 
   expect {
     flagged 1
-    not flagged 2
+    flagged 2
     not flagged 3
-    did 1 require "review.owners"
-    did_not 2 require "review.owners"
+    not flagged 4
+    not flagged 5
+    did 1 assign "pr"
+    did_not 3 assign "pr"
   }
 }
 
@@ -69,7 +77,7 @@ test "An empty changed_files list matches no critical path" {
   }
 }
 
-test "The oversized boundary is inclusive" {
+test "The oversized boundary is inclusive and assigns the owner" {
   given {
     record 1 type "pr"
     attr 1 "pr.lines_changed" 1500
@@ -83,10 +91,29 @@ test "The oversized boundary is inclusive" {
   expect {
     flagged 1
     not flagged 2
+    did 1 assign "pr"
   }
 }
 
-test "A confident high risk needs a senior review" {
+test "Pending checks leave a visible comment" {
+  given {
+    record 1 type "pr"
+    attr 1 "pr.checks_pending" true
+
+    record 2 type "pr"
+    attr 2 "pr.checks_pending" false
+  }
+
+  when rule "CI checks still running"
+
+  expect {
+    flagged 1
+    not flagged 2
+    did 1 comment "pr" contains "checks"
+  }
+}
+
+test "A confident high risk assigns the owner" {
   given {
     record 1 type "pr"
     attr 1 "pr.risk" "high"
@@ -107,7 +134,7 @@ test "A confident high risk needs a senior review" {
     flagged 1
     not flagged 2
     not flagged 3
-    did 1 require "review.senior"
+    did 1 assign "pr"
   }
 }
 
@@ -163,5 +190,39 @@ test "The description decision calls the configured model" {
   expect {
     count == 1
     tool_called "cdm" "decide"
+  }
+}
+
+test "An inconclusive AI review asks for a human" {
+  given {
+    record 1 type "code_unit"
+    attr 1 "unit.llm_result" "unclear"
+
+    record 2 type "code_unit"
+    attr 2 "unit.llm_result" "match"
+  }
+
+  when rule "AI review was inconclusive"
+
+  expect {
+    flagged 1
+    not flagged 2
+    did 1 assign "pr"
+    did 1 comment "pr" contains "human"
+  }
+}
+
+test "A failed AI review asks for a human" {
+  given {
+    record 1 type "code_unit"
+    attr 1 "unit.llm_result" "error"
+  }
+
+  when rule "AI review failed"
+
+  expect {
+    flagged 1
+    did 1 assign "pr"
+    did 1 comment "pr" contains "failed"
   }
 }

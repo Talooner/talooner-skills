@@ -64,6 +64,13 @@ If the project uses tagged runners, ask and add `tags:`.
   mode.
 - Require the `talooner` status, not a job name.
 
+## Reviewer requests
+
+A team `do require "review.<name>"` works on GitLab. Map the name in
+`.talooner/teams.yaml` to a group path, or to a list of users that needs no host
+lookup. `do assign "pr" attr "user.owner"` also works when CODEOWNERS or a
+confirmed user exists.
+
 ## Existing file
 
 If `talooner-*` jobs already exist, show them and ask before changing them. If

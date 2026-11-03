@@ -4,8 +4,9 @@
 
 Changes here wait for a review before merge.
 
-- `auth/` — authentication and sessions — reviewed by owners
-- `billing/` — payments and invoices — reviewed by owners
+- `.talooner/` — the review policy itself — owner assigned for review
+- `auth/` — authentication and sessions — owner assigned for review
+- `billing/` — payments and invoices — owner assigned for review
 
 ## Extra rules
 

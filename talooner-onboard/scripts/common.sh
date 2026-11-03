@@ -24,6 +24,22 @@ absolute_dir() {
   CDPATH='' cd -- "$1" && pwd
 }
 
+lint_rule_requires() {
+  perl -0777 -ne '
+    while (/\brule\s+"([^"]+)"\s*\{(.*?)\n\}/sg) {
+      my ($name, $body) = ($1, $2);
+      while ($body =~ /\brequires\s+"([^"]+)"/g) {
+        my $target = $1;
+        if ($body !~ /\bdo\s+require\s+"\Q$target\E"/) {
+          print "rule \"$name\": requires \"$target\" without do require\n";
+          exit 1;
+        }
+      }
+    }
+    exit 0;
+  '
+}
+
 secret_shapes_match() {
   perl -0777 -ne '
     my @p = (

@@ -91,7 +91,16 @@ argument.
 - It never commits, pushes or opens a PR/MR without an explicit yes.
 - It never changes branch protection, repository settings or secrets.
 - It never force-pushes, resets or stashes your work.
+- It never uses `git add -A`; it stages the paths it wrote.
+- It deletes only branches it created in that run.
 - It requires a clean tree.
+
+## After merge
+
+Run the probe in
+[`references/post-merge-check.md`](talooner-onboard/references/post-merge-check.md)
+to confirm the base branch has `.talooner/config.yaml` and that a throwaway PR
+gets the comment, block and owner assignment.
 
 ## Update
 
