@@ -77,14 +77,22 @@ argument.
 
 ## What it writes
 
-- `.talooner/onboarding.md` — the spec
+- `.talooner/onboarding.md` — the spec and the decisions it records
 - `.talooner/rules.tln` and `.talooner/rules.tln.test`
+- `.talooner/rules/*.tln` plus `.talooner/test-rules.sh` for a split ruleset
 - `.talooner/config.yaml` when check names are confirmed
 - `.talooner/teams.yaml` when reviewers are mapped
 - `.talooner/architecture.yaml` — the code AI review reads, one entry per code root
-- `docs/guides/*.md` when guides are selected
+- `docs/guides/*.md` when guides are selected; a section-formatted guide turns on
+  the sections review
 - `.talooner/review.md` when there are repo-wide guidelines
 - `.github/workflows/talooner.yml` or Talooner jobs in `.gitlab-ci.yml`
+
+## Versioning
+
+`metadata.version` in `talooner-onboard/SKILL.md` is the release number. The
+release job fails unless the tag without its `v` equals that value, so
+`metadata.version: 1.2.0` ships as `v1.2.0` and never drifts.
 
 ## What it will not do
 
@@ -101,7 +109,10 @@ argument.
 Run the probe in
 [`references/post-merge-check.md`](talooner-onboard/references/post-merge-check.md)
 to confirm the base branch has `.talooner/config.yaml` and that a throwaway PR
-gets the comment, block and owner assignment.
+gets the comment, block and owner assignment. The same probe checks the
+lifecycle: a draft is skipped, a human approval at the head releases the gate, a
+change request keeps it blocked, auto-approve only touches a safe PR, and a guide
+violation gets an inline comment.
 
 ## Update
 

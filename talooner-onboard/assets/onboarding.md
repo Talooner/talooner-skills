@@ -33,3 +33,11 @@ on — SubQ Snap
 ## Notes
 
 Replace these examples with the paths, reviewers and rules the user confirmed.
+
+- Big at 401 changed lines or 26 changed files; huge at 1501 or 71.
+- Generated files, lockfiles and fixtures count: the forge reports them.
+- Drafts are skipped; the review starts when the PR is ready.
+- Release: a human approval on the head commit, without a change request.
+- Fallback reviewer: the CODEOWNERS owner, else the last person to touch the file.
+- Auto-approve: off unless the check names are confirmed; then small, tested PRs only.
+- A folder without a `doc_ref` is rules-only: no guide, no AI review.

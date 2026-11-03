@@ -1,13 +1,38 @@
+define "under_review" { not attr "pr.draft" == true }
+
 define "critical_path" {
-  attr "pr.changed_files" contains ".talooner/"
-    or attr "pr.changed_files" contains "auth/"
-    or attr "pr.changed_files" contains "billing/"
-    or attr "pr.changed_files" contains "migrations/"
+  attr "pr.changed_files" starts_with ".talooner/"
+    or attr "pr.changed_files" starts_with "auth/"
+    or attr "pr.changed_files" starts_with "billing/"
+    or attr "pr.changed_files" starts_with "migrations/"
+}
+
+define "big_change" {
+  attr "pr.lines_changed" > 400 or attr "pr.files_changed" > 25
+}
+
+define "huge_change" {
+  attr "pr.lines_changed" > 1500 or attr "pr.files_changed" > 70
+}
+
+// GitLab team variant: attr "review.<team>.approved" == true
+define "approved" {
+  attr "review.human.approved" == true
+  not attr "review.changes_requested" == true
+}
+
+define "critical_pending" { is "critical_path" not is "approved" }
+define "big_core_pending" { is "big_change" is "critical_path" not is "approved" }
+define "huge_pending" { is "huge_change" not is "approved" }
+define "risk_pending" {
+  attr "pr.risk" == "high"
+  attr "pr.risk_certainty" >= 0.85
+  not is "approved"
 }
 
 rule "Block PRs with no description" {
   for records where type == "pr"
-    and attr "pr.draft" == false
+    and is "under_review"
     and attr "pr.has_description" == false
   block "merge"
   do block "pr.merge"
@@ -17,25 +42,41 @@ rule "Block PRs with no description" {
 }
 
 rule "Critical path needs review" {
-  for records where type == "pr" and is "critical_path"
+  for records where type == "pr" and is "critical_pending"
+  block "merge"
   do block "pr.merge"
   do assign "pr" attr "user.owner"
-  do comment "pr" "Changes a sensitive path; the owner is assigned for review"
+  do comment "pr" "Changes a sensitive path; a human approval on the head commit releases it"
   reason "critical path"
   priority HIGH
 }
 
-rule "Oversized PR needs human review" {
-  for records where type == "pr" and attr "pr.lines_changed" >= 1500
+rule "Big sensitive PR needs human review" {
+  for records where type == "pr"
+    and is "big_core_pending"
+    and not is "huge_pending"
+  block "merge"
   do block "pr.merge"
   do assign "pr" attr "user.owner"
-  do comment "pr" "Very large change; split it or ask for an explicit review"
-  reason "oversized"
+  do comment "pr" "A large change in a sensitive path needs a human review on the head commit"
+  reason "big sensitive change"
   priority HIGH
 }
 
+rule "Huge PR needs human review" {
+  for records where type == "pr" and is "huge_pending"
+  block "merge"
+  do block "pr.merge"
+  do assign "pr" attr "user.owner"
+  do comment "pr" "Very large change; split it or get an explicit human review"
+  reason "huge"
+  priority CRITICAL
+}
+
 rule "CI checks still running" {
-  for records where type == "pr" and attr "pr.checks_pending" == true
+  for records where type == "pr"
+    and is "under_review"
+    and attr "pr.checks_pending" == true
   do comment "pr" "Required checks are still running on this commit, so this review cannot pass yet. Run `!talooner /review` once they finish."
   reason "checks pending"
   priority LOW
@@ -53,12 +94,12 @@ enrich "cdm: how risky is this PR?" {
 }
 
 rule "Confident high risk needs a senior review" {
-  for records where type == "pr"
-    and attr "pr.risk" == "high"
-    and attr "pr.risk_certainty" >= 0.85
+  for records where type == "pr" and is "risk_pending"
+  block "merge"
   do block "pr.merge"
   do assign "pr" attr "user.owner"
   do comment "pr" "The decision model rates this change high risk"
+  reason "high risk"
   priority HIGH
 }
 
@@ -81,8 +122,29 @@ rule "Confident vague description gets a comment" {
   priority MEDIUM
 }
 
+enrich "Review changed code against its guide" {
+  for records where type == "code_unit"
+    and attr "unit.important" == true
+    and attr "unit.doc_content" != ""
+  stale_after 1 hour
+  tool "llm" "review" {
+    unit          attr "unit"
+    doc           attr "unit.doc_content"
+    diff          attr "unit.diff"
+    content       attr "unit.content"
+    changed_lines attr "unit.changed_lines"
+    test_diff     attr "unit.test_diff"
+    spec          attr "unit.spec"
+    mode          "sections"
+    quote_rule    true
+  }
+  update attr "unit.llm_result" from result.verdict
+  update attr "unit.llm_explanation" from result.explanation
+}
+
 rule "AI review was inconclusive" {
   for records where type == "code_unit" and attr "unit.llm_result" == "unclear"
+  block "merge"
   do block "pr.merge"
   do assign "pr" attr "user.owner"
   do comment "pr" "The AI review could not decide on a changed unit; a human read is required"
@@ -92,9 +154,27 @@ rule "AI review was inconclusive" {
 
 rule "AI review failed" {
   for records where type == "code_unit" and attr "unit.llm_result" == "error"
+  block "merge"
   do block "pr.merge"
   do assign "pr" attr "user.owner"
   do comment "pr" "The AI review failed on a changed unit; a human read is required"
   reason "ai review failed"
   priority MEDIUM
+}
+
+rule "Auto-approve safe changes" {
+  for records where type == "pr"
+    and is "under_review"
+    and attr "pr.has_description" == true
+    and attr "pr.tests_passing" == true
+    and not attr "review.changes_requested" == true
+    and not is "critical_pending"
+    and not is "big_core_pending"
+    and not is "huge_pending"
+    and not is "risk_pending"
+  allow "merge"
+  do approve "pr"
+  do comment "pr" "No PR-level rule holds this PR."
+  reason "auto-approved"
+  priority LOW
 }

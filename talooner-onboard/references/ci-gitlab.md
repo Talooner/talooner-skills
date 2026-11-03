@@ -12,7 +12,8 @@ Add `talooner-rules` and `talooner-review` to `.gitlab-ci.yml`.
 ## Shape
 
 - `talooner-rules` checks out the repository and runs `tln test .talooner/` on
-  `ghcr.io/talooner/talooner-runner:1.1.2`.
+  `ghcr.io/talooner/talooner-runner:1.1.2`. For a split ruleset, run
+  `sh .talooner/test-rules.sh` instead; it joins the files like Talooner does.
 - `talooner-review` needs `talooner-rules`, runs the review on the same pinned
   image, and sets `GIT_STRATEGY: none` because it does not need a checkout.
 - Keep `entrypoint: [""]` in both jobs. Without it GitLab runs the image

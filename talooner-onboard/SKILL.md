@@ -62,6 +62,12 @@ directory being the skill folder.
   `needs:` on GitLab. A review that races CI sees `pr.checks_pending == true`,
   the base ruleset refuses to approve a moving target, and nothing re-runs it
   when CI ends (`references/ci-github.md`, `references/ci-gitlab.md`).
+- Every PR-level blocking rule has a release condition: `is "approved"`
+  (`review.human.approved` on GitHub, `review.<team>.approved` on GitLab) and
+  `review.changes_requested == false`. A gate that can never release makes a
+  sensitive PR unmergeable.
+- A split ruleset always ships `.talooner/test-rules.sh`. Without it, `tln test
+  .talooner/` compiles each file alone and shared `define`s fail.
 - If a required prerequisite is missing, stop and explain how to get it; do not
   improvise.
 
@@ -74,15 +80,19 @@ Run:
 ```
 
 It prints the repo root, remote host, branch, clean/dirty state, existing
-Talooner files, existing CI, legacy Talooner files, target paths that the repo
-would ignore, tool availability, pinned image status, which credential names are
-present (never values), and the number of `.tln.test` files.
+Talooner files, whether the ruleset is split and whether it ships a test
+script, dependency manifests, existing CI, legacy Talooner files, target paths
+that the repo would ignore, tool availability, pinned image status, which
+credential names are present (never values), and the number of `.tln.test`
+files.
 
 Stop if the tree is dirty, Docker is missing, or the pinned image cannot run.
 If `legacy_talooner_files` is not `none`, read those files and plan a migration;
 do not create a parallel `.talooner/` ruleset. If `ignored_targets` is not `none`,
-plan the `.gitignore` negations before writing. Read `AGENTS.md` or `CLAUDE.md` if
-present, but do not modify them.
+plan the `.gitignore` negations before writing. If `split_ruleset=yes`, the
+repository already uses `.talooner/rules/`; tailor those files and never add a
+shadowing `.talooner/rules.tln`. Read `AGENTS.md` or `CLAUDE.md` if present, but
+do not modify them.
 
 No writes in this step.
 
@@ -216,23 +226,75 @@ user confirmed, and adapt paths, reviewers and thresholds.
 
 Baseline rules, when they apply:
 
-- Block PRs with no description.
+- Block PRs with no description, only when the PR is not a draft.
 - Always put `.talooner/` in the critical path: the policy file itself must not be
   editable without review.
 - Critical-path review for each sensitive area: `do block "pr.merge"`,
   `do assign "pr" attr "user.owner"` when CODEOWNERS or a confirmed user exists,
   and `do comment "pr" "…"`. On GitLab, or with a PAT/GitHub App, you may use
   `do require "review.<team>"` plus a `teams.yaml` mapping instead.
-- Oversized PR needs a human review, with boundary tests at the threshold.
+- Big sensitive PR needs a human review: 401+ changed lines or 26+ files in a
+  sensitive path. Huge PR needs a human review: 1501+ lines or 71+ files,
+  whatever the path. Boundary tests sit at the threshold.
 - Pending checks leave a visible comment (`pr.checks_pending == true`).
 - New dependencies need a security review, only if a manifest exists.
 - Migrations need a DBA review, only if migrations exist.
 - AI review inconclusive and AI review failed: require a human or comment. Never
   leave `unclear` or `error` silent.
-- Auto-approve only if chosen, gated on `pr.tests_passing`, optional
-  `pr.lint_passing`, non-sensitive paths, non-draft, and a description.
+- Confident high risk (`pr.risk == "high"`, `pr.risk_certainty >= 0.85`) needs a
+  human review.
+- Auto-approve only if chosen, gated on confirmed check names, and only when no
+  gate holds the PR.
 - Decision-model rules for risk and description quality, gated at
   `>= 0.85`.
+
+### Release conditions
+
+Every PR-level blocking rule must be releasable. Define `approved` once:
+
+```tln
+define "approved" {
+  attr "review.human.approved" == true
+  not attr "review.changes_requested" == true
+}
+```
+
+On GitLab's team variant, replace the first line with
+`attr "review.<team>.approved" == true` and keep the change-request guard. Then
+define each gate as `<condition> not is "approved"` and let the rule match that
+pending define. A human approval on the head commit stops the gate; a stale or
+wrong-sha approval does not, and `changes_requested` suppresses release even
+with an approval.
+
+Hard rules:
+
+- No blocking rule without a release condition.
+- Every gate has an auto-approve negation and a test.
+- Unset `pr.draft` is treated as ready for review (fail-closed); only `true`
+  skips.
+
+### Auto-approve
+
+Opt-in and PR-level. It cannot see `unit.*` facts, so a unit-level AI block
+still wins: `block` beats `approve`. The comment is exactly "No PR-level rule
+holds this PR." Gate it on `pr.has_description == true`, `pr.tests_passing ==
+true`, `not attr "review.changes_requested" == true`, and `not is` every
+`*_pending` define. `pr.tests_passing` stays unset until the check names in
+`.talooner/config.yaml` match, so an unconfirmed name means auto-approve never
+fires.
+
+Tests: a safe PR is approved; draft, no description, unset `tests_passing`,
+`changes_requested`, critical, big, huge and high-risk are all not approved; a
+human approval releases the gate and a separate `when` check lets auto-approve
+fire.
+
+### Paths and size
+
+- Use `starts_with`, not `contains`. `vendor/.talooner/` and
+  `src/authorization/` must not match.
+- Size has two axes: `pr.lines_changed` and `pr.files_changed`. Thresholds are
+  exclusive (`> 400`, not `>= 400`), and tests cover both sides of each.
+- `pr.risk_certainty` and `pr.description_certainty` gate at 0.85.
 
 Do not write:
 
@@ -246,14 +308,24 @@ Do not write:
 - A team `do require` on GitHub Actions with `GITHUB_TOKEN`; it fails with a 422.
   Use assignment or a user target.
 
+### Split rulesets
+
+When the repository already uses `.talooner/rules/*.tln`, keep that layout and
+ship `.talooner/test-rules.sh`. Talooner joins `_*.tln` first, then the rest by
+name, into one ruleset. `tln test .talooner/` cannot do that, so it fails with
+`undefined define reference`. The script joins exactly like Talooner and tests
+the result; copy it from `assets/test-rules.sh`, keep it POSIX `sh`, and point
+the CI rules job at it. A split ruleset without the script is not ready.
+
 Tests:
 
 - One matching and one non-matching record per rule.
-- Boundary values for thresholds.
-- Unset facts: `pr.tests_passing` absent, `pr.changed_files` empty,
+- Boundary values for thresholds, on both size axes.
+- Unset facts: `pr.draft`, `pr.tests_passing` absent, `pr.changed_files` empty,
   `user.owner` absent.
 - Path lookalikes for each path predicate.
 - Confident, unsure and error decisions, with `mock tool "cdm" "decide"`.
+- The auto-approve matrix above.
 - Every test passes with the pinned image.
 
 If existing rules exist, read them first, show them, and propose a diff. Keep
@@ -270,11 +342,16 @@ It is not a docs index: it is what turns AI review on. With no architecture rule
 at all, Talooner sends no `code_units`, so `llm_review` never reads the change and
 no inline comment can ever be posted, however many rules the repo has.
 
-Write one entry per top-level code root the analysis found — `src/`, `lib/`,
-`app/`, `internal/`, `pkg/`, `services/` and so on — not only the sensitive ones.
-Without an entry, a folder is invisible to AI review: it is neither a code unit
-nor a place an inline comment can land. `kind` is required; `doc_ref` is only for
-a folder the user interviewed:
+Build a stack profile per code root from the manifests `doctor.sh` reported and
+the analysis the user approved: language, framework and version. Use it to
+propose roots and candidate guide sections, then ask the five questions in
+`references/guide-prompts.md` and write only what the user confirms.
+
+Write one entry per top-level code root — `src/`, `lib/`, `app/`, `internal/`,
+`pkg/`, `services/` and so on — not only the sensitive ones. Without an entry, a
+folder is invisible to AI review: it is neither a code unit nor a place an inline
+comment can land. `kind` is required; `doc_ref` is only for a folder the user
+interviewed:
 
 ```yaml
 - path: internal/
@@ -286,15 +363,25 @@ a folder the user interviewed:
   doc_ref: docs/guides/payments.md
 ```
 
-`kind` is `model`, `controller` or `service`.
+`kind` is `model`, `controller` or `service`. The longest prefix wins; a file may
+be its own entry; a nested entry inherits the nearest parent `doc_ref` unless it
+sets `inherit: false`. An entry without `doc_ref` is rules-only: a unit exists,
+but the model reads nothing. `verify.sh` warns on those entries.
 
-Only folders with a `doc_ref` need a guide. Write or extend that guide:
+`doc_ref` is the AI review switch. Only folders with one get a guide. Write or
+extend that guide in the shape of `assets/guide.md`:
 
-- One `###` section per checkable rule; the heading names the rule.
-- Concrete: a call, a check, a name, a number.
+- Six to twelve `###` sections; one per checkable rule; the first sentence is
+  the rule (`quote_rule` sends it).
+- `Applies to:` when the rule is scoped to part of the root.
 - A `> **Gotcha**:` with the typical wrong code where the user has one.
 - A `## Specs` section with `### <file path>` and one bullet per required case.
 - Judgement calls under `## Advice`; they inform, they do not block.
+- Reuse an existing doc or linter config rather than duplicating it.
+
+When the root has a section-formatted guide, the starter's sections review runs
+(`mode "sections"`). The enrich requires `unit.doc_content != ""`, so units with
+no guide are not sent. Without a guide, the base review still runs.
 
 Check each section against the current code and report violations. Never fix them
 silently. Keep the repository's docs style; extend an existing doc rather than
@@ -323,6 +410,10 @@ GitHub Actions:
   `actions: read` in the review job's permissions.
 - Rules use `ghcr.io/talooner/talooner-runner:1.1.2`; review uses
   `ghcr.io/talooner/talooner-runner:1.1.2-gh`.
+- For a split ruleset the rules job runs `--entrypoint sh` with
+  `.talooner/test-rules.sh` instead of `--entrypoint tln … test .talooner/`.
+  Keep the `pull_request_review` trigger: it re-runs the review after an
+  approval.
 - Add the chosen model and decision-model env. Use the provider's exact model id;
   do not infer it from another provider's catalog.
 - Do not use a team `do require` with `GITHUB_TOKEN`; it fails with a 422. Use
@@ -345,6 +436,8 @@ GitLab CI:
   `talooner-review`'s `needs` is the equivalent ordering. If stages come only
   from an include, stop and ask the user to add the jobs by hand.
 - Keep `entrypoint: [""]` and `needs: [talooner-rules]`.
+- For a split ruleset the `talooner-rules` script is `sh .talooner/test-rules.sh`
+  instead of `tln test .talooner/`.
 - Set `GIT_STRATEGY: none` on the review job only; the rules job needs the
   checkout.
 - Never name a job exactly `talooner`.
@@ -363,9 +456,11 @@ Run:
 ```
 
 It checks the tree, required files, ignored generated files, legacy Talooner
-paths, `requires`/`do require` pairing, `tln test` with the pinned image, config
-sanity, CI wiring and token shapes, plus removed commands and local absolute
-paths in the files it generated. It exits non-zero on any failure.
+paths, `doc_ref` existence, `requires`/`do require` pairing, `tln test` with the
+pinned image (or the joined `.talooner/test-rules.sh` for a split ruleset),
+config sanity, CI wiring and token shapes, plus removed commands and local
+absolute paths in the files it generated. It warns on architecture entries with
+no `doc_ref`. It exits non-zero on any failure.
 
 `--strict` fails when config sanity is skipped. To run the real config check,
 supply the provider and a forge token without printing either:
@@ -459,7 +554,8 @@ Summarize:
   current-code violations found.
 - CI file and jobs.
 - Secrets the user still needs to set.
-- How to run the rules test locally.
+- How to run the rules test locally: `tln test .talooner/` in the pinned image,
+  or `sh .talooner/test-rules.sh` for a split ruleset.
 - How to leave advice mode and turn on blocking.
 - What the first review will show, and what it will not show on the onboarding
   PR.

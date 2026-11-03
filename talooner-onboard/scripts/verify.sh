@@ -75,7 +75,12 @@ if [ -f .talooner/onboarding.md ]; then ok "onboarding spec exists"; else bad "m
 
 has_rules=no
 [ -f .talooner/rules.tln ] && has_rules=yes
-for f in .talooner/rules/*.tln; do [ -f "$f" ] && has_rules=yes; done
+split=no
+for f in .talooner/rules/*.tln; do
+  [ -f "$f" ] || continue
+  has_rules=yes
+  split=yes
+done
 if [ "$has_rules" = yes ]; then
   ok "rules exist"
 else
@@ -89,6 +94,16 @@ if [ "$has_tests" = yes ]; then
   ok "rule tests exist"
 else
   bad "missing rule tests"
+fi
+
+test_script=
+if [ "$split" = yes ]; then
+  if [ -f .talooner/test-rules.sh ]; then
+    test_script=.talooner/test-rules.sh
+    ok "split ruleset has .talooner/test-rules.sh"
+  else
+    bad "split ruleset needs .talooner/test-rules.sh: tln test .talooner/ compiles each pair alone and cannot see shared defines"
+  fi
 fi
 
 ci_github=
@@ -111,6 +126,30 @@ done
 
 if [ -f .talooner/architecture.yaml ]; then
   ok "architecture.yaml exists"
+  doc_refs=$(sed -n 's/^[[:space:]]*doc_ref:[[:space:]]*//p' .talooner/architecture.yaml | tr ',' '\n' | sed 's/^[[:space:]]*\[//;s/\]//;s/^[[:space:]]*//;s/[[:space:]]*$//;s/^"//;s/"$//')
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    if [ -f "$ref" ]; then
+      ok "doc_ref exists: $ref"
+      if ! grep -Eq '^#{2,3} ' "$ref"; then
+        warn "$ref has no ## or ### headings; the sections review needs one ### per rule"
+      fi
+    else
+      bad "missing doc_ref: $ref (name the file, or drop doc_ref to make the entry rules-only)"
+    fi
+  done <<EOF
+$doc_refs
+EOF
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    warn "architecture entry without doc_ref is rules-only:${entry#- path:} (AI review reads nothing)"
+  done <<EOF
+$(awk '
+  /^[[:space:]]*-[[:space:]]*path:/ { if (n && !d) print p; p=$0; d=0; n=1; next }
+  /^[[:space:]]*doc_ref:/ { d=1 }
+  END { if (n && !d) print p }
+' .talooner/architecture.yaml)
+EOF
 else
   bad "missing .talooner/architecture.yaml: with no architecture rule Talooner sends no code units, so AI review never runs and no inline comment can be posted"
 fi
@@ -165,7 +204,18 @@ else
 fi
 
 out=$(mktemp)
-if docker run --rm --user "$(id -u):$(id -g)" \
+if [ "$split" = yes ]; then
+  if [ -z "$test_script" ]; then
+    bad "split ruleset test (missing .talooner/test-rules.sh)"
+  elif docker run --rm --user "$(id -u):$(id -g)" \
+    -v "$PWD:/repo" -w /repo --entrypoint sh \
+    "$RUNNER_IMAGE" "$test_script" >"$out" 2>&1; then
+    ok "$test_script"
+  else
+    cat "$out"
+    bad "$test_script"
+  fi
+elif docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/repo" -w /repo --entrypoint tln \
   "$RUNNER_IMAGE" test .talooner/ >"$out" 2>&1; then
   ok "tln test .talooner/"
@@ -209,7 +259,9 @@ if [ -n "$ci_github" ]; then
   if grep -Eq '^  rules:' "$ci_github"; then ok "GitHub rules job"; else bad "GitHub rules job missing"; fi
   if grep -Eq '^  review:' "$ci_github"; then ok "GitHub review job"; else bad "GitHub review job missing"; fi
   if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE_GH")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub review uses pinned -gh image"; else bad "GitHub review image is not $RUNNER_IMAGE_GH"; fi
-  if grep -Eq -- "--entrypoint tln $(image_re "$RUNNER_IMAGE") test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi
+  if [ "$split" = yes ]; then
+    if grep -q -- 'test-rules.sh' "$ci_github" && grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub rules run .talooner/test-rules.sh on the pinned image"; else bad "GitHub rules do not run .talooner/test-rules.sh on $RUNNER_IMAGE"; fi
+  elif grep -Eq -- "--entrypoint tln $(image_re "$RUNNER_IMAGE") test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi
   if grep -q 'TALOONER_LICENSE_KEY' "$ci_github"; then ok "GitHub license key is wired"; else bad "GitHub license key is not wired"; fi
   if grep -Eq 'ANTHROPIC_API_KEY|OPENAI_API_KEY|TALOONER_MODEL_API_KEY|TALOONER_MODEL_BASE_URL' "$ci_github"; then ok "GitHub model env is wired"; else bad "GitHub model env is not wired"; fi
   if grep -q 'CDM_URL' "$ci_github" && grep -q 'CDM_TOKEN' "$ci_github"; then ok "GitHub decision-model env is wired"; else bad "GitHub decision-model env is not wired"; fi
@@ -221,6 +273,9 @@ if [ -n "$ci_gitlab" ]; then
   if grep -q 'entrypoint: \[""\]' "$ci_gitlab"; then ok "GitLab entrypoint is empty"; else bad "GitLab entrypoint is not empty"; fi
   if grep -Eq 'needs: \[talooner-rules\]' "$ci_gitlab"; then ok "GitLab review needs rules"; else bad "GitLab review does not need talooner-rules"; fi
   if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE")([^0-9A-Za-z._-]|$)" "$ci_gitlab"; then ok "GitLab uses pinned image"; else bad "GitLab does not use $RUNNER_IMAGE"; fi
+  if [ "$split" = yes ]; then
+    if grep -q -- 'test-rules.sh' "$ci_gitlab"; then ok "GitLab rules run .talooner/test-rules.sh"; else bad "GitLab rules do not run .talooner/test-rules.sh"; fi
+  fi
   if grep -Eq '^talooner:' "$ci_gitlab"; then
     bad "GitLab has a job named talooner"
   else

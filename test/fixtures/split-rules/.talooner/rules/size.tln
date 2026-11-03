@@ -1,0 +1,8 @@
+rule "Huge PR needs a human" {
+  for records where type == "pr" and attr "pr.lines_changed" > 1500
+  block "merge"
+  do block "pr.merge"
+  do comment "pr" "Split this very large change"
+  reason "huge"
+  priority CRITICAL
+}

@@ -13,7 +13,12 @@ git show "origin/$base:.talooner/config.yaml"
 git show "origin/$base:.talooner/rules.tln"
 git show "origin/$base:.talooner/rules.tln.test"
 git show "origin/$base:.talooner/architecture.yaml"
+git show "origin/$base:.talooner/test-rules.sh" 2>/dev/null || true
 ```
+
+For a split ruleset the first two rule shows fail; that is expected. Confirm
+`.talooner/rules/*.tln` and `.talooner/test-rules.sh` are on the base branch
+instead.
 
 `config.yaml` must be present. If the runner logged
 `no config on the base branch, no check patterns`, `pr.tests_passing` and
@@ -49,7 +54,8 @@ path, touch that instead, and replace `internal/` with a root
 
 ## 3. Confirm the run
 
-- `rules` is green and runs the rule tests.
+- `rules` is green and runs the rule tests (`tln test .talooner/`, or
+  `.talooner/test-rules.sh` for a split ruleset).
 - `review` is green.
 - The `talooner` check is `success` in advice mode, with
   `Changes requested (advisory)`.
@@ -68,7 +74,26 @@ path, touch that instead, and replace `internal/` with a root
 - If the decision model is configured, check the log for the decision call and
   the facts it wrote. A missing call means the decision path is still unproven.
 
-## 4. Close it
+## 4. Confirm the lifecycle
+
+1. **Draft skip.** Open the probe as a draft first. There is no review comment
+   on a draft; the review starts when the PR is ready.
+2. **Block.** The sensitive-path rule blocks and assigns the owner.
+3. **Release.** Approve the PR at the head commit. The `pull_request_review`
+   trigger re-runs the review; the gate rule stops firing and the check goes
+   green. A review left on an older commit does not release it.
+4. **Change request.** On a second probe, request changes and approve. The PR
+   stays blocked: `review.changes_requested` beats an approval.
+5. **Auto-approve.** On a safe probe (non-sensitive path, description, confirmed
+   check names passing), auto-approve approves it and comments "No PR-level rule
+   holds this PR." A draft, a missing description, an unset `pr.tests_passing`,
+   or any open gate keeps it off.
+6. **Sections finding.** If a root has a guide, break one `###` rule in the
+   probe and confirm the review leaves an inline comment naming that file.
+7. **Split job.** For a split ruleset, the rules job output shows the joined
+   `rules.tln` being tested, not a per-file failure.
+
+## 5. Close it
 
 ```sh
 gh pr close probe/talooner-check --comment "Probe verified; closing without merging."
@@ -79,7 +104,7 @@ git branch -D probe/talooner-check
 
 Delete only the branch this probe created.
 
-## 5. Then
+## 6. Then
 
 - Leave advice mode only after the team has seen a few real reviews.
 - Require the `talooner` check, not the `review` job, in branch protection.

@@ -1,3 +1,5 @@
+# `pr.tests_passing` and `pr.lint_passing` stay unset until these names match
+# real check runs, so auto-approve can never fire on an unconfirmed name.
 checks:
   tests:
     - test

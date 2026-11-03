@@ -15,8 +15,11 @@
 - Duplicate `strict` rule — remove it; the base ruleset already provides it.
 - A `require` target does not resolve — add it to `.talooner/teams.yaml` or use a
   real user.
-- A split ruleset shares `define`s across files — `tln test .talooner/` tests each
-  file on its own. Keep shared definitions in a file that starts with `_`.
+- A split ruleset fails with `undefined define reference` — `tln test
+  .talooner/` compiles each pair alone, so shared `define`s are invisible. Ship
+  `.talooner/test-rules.sh` (copy `assets/test-rules.sh`), run it locally and
+  point the CI rules job at it. `verify.sh` fails and names the script when it
+  is missing.
 
 ## Generated files are ignored
 
@@ -56,6 +59,33 @@ Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
   refuses to approve a moving target. Fix the ordering
   (`references/ci-github.md`, `references/ci-gitlab.md`); a tenant rule that
   comments on `pr.checks_pending == true` only makes the block visible.
+
+## Sensitive PRs
+
+- A sensitive PR stays red after approval — the release fact is
+  `review.human.approved` (or `review.<team>.approved` on GitLab) at the head
+  commit, and `review.changes_requested` must be false. A stale or wrong-sha
+  approval does not release. On GitHub, check the `pull_request_review` trigger
+  exists so the review re-runs after the approval.
+- Auto-approve never fires — it needs `pr.tests_passing == true`, which stays
+  unset until `.talooner/config.yaml` names the real check runs. It also never
+  fires on a draft, a PR with no description, or one a gate still holds
+  (critical, big, huge, high risk); that is by design.
+- Auto-approve approved something it should not — auto-approve sees only PR
+  facts. A unit-level fact such as `unit.llm_result` is invisible to it; that
+  block still wins, but the approval comment can look contradictory.
+
+## AI review
+
+- No inline comment, ever — `.talooner/architecture.yaml` maps no changed code
+  unit, or the unit has no `doc_ref`. Without both, the model reads nothing.
+- `verify.sh` warns "rules-only" — the entry has no `doc_ref`, so it creates a
+  unit but no AI review. Add a guide or accept it.
+- `verify.sh` fails on `doc_ref` — the file named there does not exist. Write it
+  or drop the field.
+- A documented unit is not reviewed — the sections enrich requires
+  `unit.important == true` and `unit.doc_content != ""`. Check the entry and the
+  guide headings (`##` or `###`).
 
 ## License
 

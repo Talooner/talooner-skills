@@ -21,10 +21,19 @@ on — provider: anthropic, model: claude-sonnet-5-5
 
 on — SubQ Snap
 
+## AI review units
+
+- `app/` — docs/guides/app.md
+
 ## Guides
 
-- `billing/` — docs/guides/payments.md
+- `app/` — docs/guides/app.md
 
 ## Notes
 
-Replace these examples with the paths, reviewers and rules the user confirmed.
+Thresholds: big at 401 lines or 26 files, huge at 1501 lines or 71 files.
+Generated and lockfile files count, because the forge reports them.
+Drafts are skipped; the review starts when the PR is ready.
+Release: a human approval on the head commit, without a change request.
+Fallback reviewer: the CODEOWNERS owner, else the last toucher.
+Folders outside `app/` are rules-only: no guide, no AI review.

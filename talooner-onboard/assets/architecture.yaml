@@ -1,5 +1,25 @@
+# This file is what turns AI review on. With no entry, a changed folder
+# produces no code unit, so the model reads nothing and no inline comment can
+# land there.
+#
+# Longest prefix wins. A folder is one code unit; a file can be its own.
+# An entry with `doc_ref` is AI-reviewed against that guide. Without `doc_ref`
+# it is rules-only: a unit exists, but the model reads nothing.
 - path: app/
   kind: service
-- path: billing/
+  doc_ref: docs/guides/app.md
+
+# A nested entry inherits the nearest parent `doc_ref` unless this says
+# otherwise. `inherit: false` makes a folder rules-only under a documented
+# parent.
+- path: app/services/
   kind: service
-  doc_ref: docs/guides/payments.md
+  inherit: false
+
+# A single file can be its own unit when it deserves its own guide.
+- path: app/main.go
+  kind: service
+
+# Rules-only, no AI review: no guide, no `doc_ref`.
+- path: internal/
+  kind: service
