@@ -51,7 +51,6 @@ directory being the skill folder.
   If the working tree is dirty, stop and ask the user to commit or stash.
 - Do not read source files before the analysis-consent step.
 - Do not claim success until `"$SKILL_DIR/scripts/verify.sh"` passes.
-- Do not reference Talooner's private source repositories or internal paths.
 - Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.1.2`, never
   `latest`, for generated CI and local validation.
 - If a required prerequisite is missing, stop and explain how to get it; do not
