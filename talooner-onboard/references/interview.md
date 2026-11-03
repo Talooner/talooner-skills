@@ -46,7 +46,8 @@ calls where a rule asks for them, the license check, and a run summary."
 Do not read source before an explicit yes.
 
 If the user says no: stay at layout only, write the spec from what they tell you,
-and leave guides out.
+leave guides out, and still write `.talooner/architecture.yaml` entries for the
+top-level code roots the layout shows. Without that file there is no AI review.
 
 ## 2. License
 
@@ -186,10 +187,25 @@ Before committing, run `git check-ignore -v .talooner/config.yaml`. A bare
 `!.talooner/config.yaml` after that rule. The same trap applies to
 `.talooner/rules.tln.test` when the repo ignores `*.test`.
 
-## 11. Guides
+## 11. AI review units
 
-Propose candidate folders from the approved analysis, not just sensitive ones.
-Explain the cost: each guide adds tokens to AI review and needs a real interview.
+Question: "Which folders should AI review read?"
+
+Say plainly: `.talooner/architecture.yaml` is what turns AI review on. With no
+entry at all, Talooner sends no code units, so the model never reads the change
+and no inline comment can ever be posted — only the one summary comment. A folder
+with no entry is invisible to AI review, which is how a `pkg/` move quietly goes
+unreviewed while a ruleset of nine rules says it is fine.
+
+So this question has a floor: at least one entry per top-level code root, always,
+even when the user wants no guides and no extra tokens. Beyond that floor, each
+entry costs tokens on every review, so cover the code that matters rather than
+the whole tree.
+
+Propose candidate folders from the approved analysis, not just sensitive ones:
+`src/`, `lib/`, `app/`, `internal/`, `pkg/`, `services/`, then narrow from there.
+Name the folders left without an entry, and say a change there is reviewed by
+rules only.
 
 For each selected folder ask:
 
@@ -199,8 +215,10 @@ For each selected folder ask:
 - What does the wrong version look like?
 - Which tests must exist for each file?
 
-Write `architecture.yaml` entries and `docs/guides/<area>.md`. Check each section
-against the current code and report violations; do not fix them silently.
+Write `architecture.yaml` entries for every confirmed folder, with `doc_ref` only
+where the user answered the questions above, and `docs/guides/<area>.md` for each
+of those. Check each section against the current code and report violations; do
+not fix them silently.
 
 ## 12. Repo-wide guidelines
 

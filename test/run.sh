@@ -122,6 +122,17 @@ git -C "$TMP/missing-rules" -c user.name=fixture -c user.email=fixture@example.c
 git -C "$TMP/missing-rules" -c user.name=fixture -c user.email=fixture@example.com commit -qm remove-rules
 expect_verify missing-rules "$TMP/missing-rules" 1
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/missing-architecture"
+rm -f "$TMP/missing-architecture/.talooner/architecture.yaml"
+git -C "$TMP/missing-architecture" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/missing-architecture" -c user.name=fixture -c user.email=fixture@example.com commit -qm remove-architecture
+expect_verify missing-architecture "$TMP/missing-architecture" 1
+if grep -q 'missing .talooner/architecture.yaml' "$TMP/missing-architecture.out"; then
+  pass "verify names the missing architecture.yaml"
+else
+  bad "verify does not name the missing architecture.yaml"
+fi
+
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/failing-test"
 sed 's/flagged 1$/flagged 999/' "$TMP/failing-test/.talooner/rules.tln.test" > "$TMP/failing-test/.talooner/rules.tln.test.new"
 mv "$TMP/failing-test/.talooner/rules.tln.test.new" "$TMP/failing-test/.talooner/rules.tln.test"
