@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   runner_version: 1.1.2
 ---
 
@@ -57,6 +57,11 @@ directory being the skill folder.
   `verify: INCOMPLETE` means not ready.
 - Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.1.2`, never
   `latest`, for generated CI and local validation.
+- The review runs last. Generated CI starts it only after the repository's own
+  tests and lints have finished: the wait step on GitHub, a later stage or
+  `needs:` on GitLab. A review that races CI sees `pr.checks_pending == true`,
+  the base ruleset refuses to approve a moving target, and nothing re-runs it
+  when CI ends (`references/ci-github.md`, `references/ci-gitlab.md`).
 - If a required prerequisite is missing, stop and explain how to get it; do not
   improvise.
 
@@ -296,6 +301,10 @@ GitHub Actions:
 - If it exists and is already a Talooner workflow, show it and ask before
   changing it. If it is a different workflow, stop; do not overwrite.
 - Keep the `rules` → `review` → `resolve` structure.
+- Keep the wait step (`wait for the other checks on this commit`) between the
+  rules check and the review. It is what makes `pr.checks_pending` false; the
+  pinned 1.1.2 snippet predates it, so add it when it is missing. It needs
+  `actions: read` in the review job's permissions.
 - Rules use `ghcr.io/talooner/talooner-runner:1.1.2`; review uses
   `ghcr.io/talooner/talooner-runner:1.1.2-gh`.
 - Add the chosen model and decision-model env. Use the provider's exact model id;
@@ -312,8 +321,13 @@ GitLab CI:
 - If the file does not exist, create it from the snippet.
 - Preserve `stages`, `include`, `default` and unrelated jobs.
 - If `talooner-*` jobs exist, show them and ask before changing them.
-- Choose `test` if declared; otherwise the last declared stage. If stages come
-  only from an include, stop and ask the user to add the jobs by hand.
+- Put `talooner-review` in a stage after every job that checks the merge
+  request: the last declared stage, never the stage the repository's own tests
+  and lints run in. Jobs in one stage run concurrently, so a review placed
+  beside them starts while their statuses are still pending and is blocked.
+  If the pipeline already uses `needs:`, adding the test/lint jobs to
+  `talooner-review`'s `needs` is the equivalent ordering. If stages come only
+  from an include, stop and ask the user to add the jobs by hand.
 - Keep `entrypoint: [""]` and `needs: [talooner-rules]`.
 - Set `GIT_STRATEGY: none` on the review job only; the rules job needs the
   checkout.

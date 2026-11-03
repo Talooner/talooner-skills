@@ -58,12 +58,14 @@ unset for a new file with no last toucher, and the action then no-ops with
 
 The base strict ruleset has a rule that blocks while required checks are still
 running. It has no comment action, so a run can say "1 rule fired" with nothing on
-the PR. Add a tenant comment:
+the PR. The ordering in `references/ci-github.md` / `references/ci-gitlab.md` is
+what keeps the review from seeing pending checks at all; this rule only makes
+the case visible when a check outlives the review:
 
 ```tln
 rule "CI checks still running" {
   for records where type == "pr" and attr "pr.checks_pending" == true
-  do comment "pr" "Waiting for required checks to finish."
+  do comment "pr" "Required checks are still running on this commit, so this review cannot pass yet. Run `!talooner /review` once they finish."
   priority LOW
 }
 ```
