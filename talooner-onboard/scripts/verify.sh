@@ -131,8 +131,38 @@ if [ -f .talooner/architecture.yaml ]; then
     [ -n "$ref" ] || continue
     if [ -f "$ref" ]; then
       ok "doc_ref exists: $ref"
-      if ! grep -Eq '^#{2,3} ' "$ref"; then
-        warn "$ref has no ## or ### headings; the sections review needs one ### per rule"
+      sections=$(awk '
+        function flush() {
+          if (h2 != "" && prose && !h3) n++
+          prose = 0; h3 = 0
+        }
+        /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
+        fence { next }
+        /^## / {
+          flush()
+          h = substr($0, 4)
+          if (h == "Specs" || h == "Advice") { reserved = 1; h2 = "" } else { reserved = 0; h2 = h }
+          next
+        }
+        /^### / {
+          if (h2 != "") { h3 = 1; n++ }
+          else if (!reserved) { orphan = 1 }
+          next
+        }
+        /^[*_]*Applies to[*_]*:/ { if (h2 != "" && $0 !~ /`/) empty++; next }
+        { if (h2 != "" && $0 ~ /[^ \t]/) prose = 1 }
+        END { flush(); printf "%d %d %d\n", n, empty + 0, orphan + 0 }
+      ' "$ref")
+      found=$(printf '%s' "$sections" | cut -d' ' -f1)
+      applies_empty=$(printf '%s' "$sections" | cut -d' ' -f2)
+      orphan=$(printf '%s' "$sections" | cut -d' ' -f3)
+      if [ "$found" -eq 0 ]; then
+        bad "$ref has no ### rule under a ## heading; the sections review asks nothing and every unit falls back to the default review"
+      elif [ "$orphan" -eq 1 ]; then
+        warn "$ref has a ### heading with no ## heading above it; the sections review skips it"
+      fi
+      if [ "$applies_empty" -gt 0 ]; then
+        warn "$ref has an Applies to: line with no backticked path; that section applies to every file"
       fi
     else
       bad "missing doc_ref: $ref (name the file, or drop doc_ref to make the entry rules-only)"

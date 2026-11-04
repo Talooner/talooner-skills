@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.2.0
+  version: 1.2.1
   runner_version: 1.1.2
 ---
 
@@ -233,6 +233,9 @@ Baseline rules, when they apply:
   `do assign "pr" attr "user.owner"` when CODEOWNERS or a confirmed user exists,
   and `do comment "pr" "…"`. On GitLab, or with a PAT/GitHub App, you may use
   `do require "review.<team>"` plus a `teams.yaml` mapping instead.
+- Reviewer mode: when the user chose block-and-comment, omit every `do assign`
+  and every `did … assign` assertion from the tests. A rule that assigns nobody
+  is noise in the log, and an assertion for it fails the rules test.
 - Big sensitive PR needs a human review: 401+ changed lines or 26+ files in a
   sensitive path. Huge PR needs a human review: 1501+ lines or 71+ files,
   whatever the path. Boundary tests sit at the threshold.
@@ -371,9 +374,13 @@ but the model reads nothing. `verify.sh` warns on those entries.
 `doc_ref` is the AI review switch. Only folders with one get a guide. Write or
 extend that guide in the shape of `assets/guide.md`:
 
-- Six to twelve `###` sections; one per checkable rule; the first sentence is
-  the rule (`quote_rule` sends it).
-- `Applies to:` when the rule is scoped to part of the root.
+- Six to twelve `###` rules, each under a `## <group>` heading. A `###` with no
+  `##` heading above it is skipped by the section review, so the guide parses as
+  empty and every unit falls back to the default review.
+- The first sentence of a rule is the rule (`quote_rule` sends it).
+- `Applies to:` when the rule is scoped to part of the root, always with the
+  paths in backticks or comma-separated. A line that names no path applies the
+  section to every file and warns `section_applies_to_empty`.
 - A `> **Gotcha**:` with the typical wrong code where the user has one.
 - A `## Specs` section with `### <file path>` and one bullet per required case.
 - Judgement calls under `## Advice`; they inform, they do not block.
@@ -563,6 +570,9 @@ Summarize:
   `.talooner/config.yaml` and `.talooner/architecture.yaml` are on the base
   branch, open a throwaway PR touching a sensitive path and a mapped code root,
   check the comment, block, assignment and `code units resolved`, then close it.
+- The release path is not provable on the probe, because the author cannot
+  approve their own PR/MR. Say it becomes available on the first real PR/MR,
+  where someone other than the author approves and the gate releases.
 
 Links: `https://talooner.dev/rules/`, `https://talooner.dev/install/`,
 `https://tln-lang.org/`, `https://github.com/Talooner/feedback`.

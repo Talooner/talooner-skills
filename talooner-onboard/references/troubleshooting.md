@@ -85,7 +85,14 @@ Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
   or drop the field.
 - A documented unit is not reviewed — the sections enrich requires
   `unit.important == true` and `unit.doc_content != ""`. Check the entry and the
-  guide headings (`##` or `###`).
+  guide headings: every rule needs a `## group` heading above its `###` rule.
+- `llm_review_step_fallback` with "guide has no sections to ask about" — the
+  guide has no `###` rule under a `##` heading, so the tenant review step failed
+  and the default review ran instead. Add `##` group headings; `verify.sh` fails
+  on a guide with no parseable section.
+- `section_applies_to_empty` — an `Applies to:` line names no backticked path, so
+  the section was applied to every file. Write the paths in backticks or
+  comma-separated.
 
 ## License
 

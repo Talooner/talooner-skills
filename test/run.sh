@@ -78,6 +78,62 @@ else
   bad "verify does not name the missing doc_ref"
 fi
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/flat-guide"
+cat > "$TMP/flat-guide/docs/guides/app.md" <<'MD'
+# app guide
+
+### Return errors, do not log them in handlers
+
+A handler returns the error to the caller.
+MD
+git -C "$TMP/flat-guide" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/flat-guide" -c user.name=fixture -c user.email=fixture@example.com commit -qm flat-guide
+expect_verify flat-guide "$TMP/flat-guide" 1
+if grep -q 'no ### rule under a ## heading' "$TMP/flat-guide.out"; then
+  pass "verify names a guide whose ### rules have no ## heading"
+else
+  bad "verify does not name a guide whose ### rules have no ## heading"
+fi
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/applies-empty"
+cat > "$TMP/applies-empty/docs/guides/app.md" <<'MD'
+# app guide
+
+## Handlers
+
+Return every error to the caller.
+
+### Logging
+
+A handler never logs a request body.
+
+Applies to: the handler paths.
+MD
+git -C "$TMP/applies-empty" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/applies-empty" -c user.name=fixture -c user.email=fixture@example.com commit -qm applies-empty
+expect_verify applies-empty "$TMP/applies-empty" 0
+if grep -q 'Applies to: line with no backticked path' "$TMP/applies-empty.out"; then
+  pass "verify warns on an Applies to: line with no path"
+else
+  bad "verify does not warn on an Applies to: line with no path"
+fi
+
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/h2-guide"
+cat > "$TMP/h2-guide/docs/guides/app.md" <<'MD'
+# app guide
+
+## Return errors, do not log them in handlers
+
+A handler returns the error to the caller and logs once at the edge.
+
+## Never put request bodies in a log line
+
+Request bodies carry customer data.
+MD
+git -C "$TMP/h2-guide" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/h2-guide" -c user.name=fixture -c user.email=fixture@example.com commit -qm h2-guide
+expect_verify h2-guide "$TMP/h2-guide" 0
+
 out="$TMP/clean-repo.incomplete"
 if "$VERIFY" --repo "$TMP/clean-repo" >"$out" 2>&1 && grep -q '^verify: INCOMPLETE' "$out"; then
   pass "verify reports INCOMPLETE without credentials"

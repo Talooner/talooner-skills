@@ -87,12 +87,14 @@ the ones the user confirms.
 Good:
 
 ```markdown
+## Refunds
+
 ### Refunds carry an idempotency key
 
 Every refund call includes the caller's key, and a repeat with the same key
 returns the first result instead of charging twice.
 
-Applies to: `billing/refund*.go`.
+Applies to: `billing/refund.go`.
 ```
 
 Bad:
@@ -108,9 +110,13 @@ The bad one is unmeasurable, so every review either ignores it or argues with it
 ## Shape
 
 - `# <area> guide` heading.
-- One `###` per rule; the first sentence is the rule.
-- `Applies to:` when the rule is scoped to part of the root.
+- `## <group>` headings, then one `###` per rule under them. The section review
+  only reads a `###` that sits under a `##`; a `###` straight under the `#` title
+  is invisible, and a guide with none of either fails `verify.sh`.
+- The first sentence of the rule is the rule.
+- `Applies to:` when the rule is scoped to part of the root, with the paths in
+  backticks or comma-separated. A line that names no path applies to every file.
 - `## Specs` with `### <file path>` and one bullet per required case.
 - `## Advice` for taste that informs but does not block.
-- Six to twelve sections. Beyond that, the model loses the thread and the cost
+- Six to twelve rules. Beyond that, the model loses the thread and the cost
   climbs.

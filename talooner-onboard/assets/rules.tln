@@ -1,3 +1,8 @@
+// Reviewer modes. The `do assign "pr" attr "user.owner"` lines are for a repo
+// with CODEOWNERS or a confirmed user. When the spec chose block-and-comment,
+// delete every one of them and the `did … assign "pr"` assertions in the sibling
+// `.tln.test`; the block, the comment and the release condition stay the same.
+
 define "under_review" { not attr "pr.draft" == true }
 
 define "critical_path" {
