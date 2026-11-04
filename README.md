@@ -19,49 +19,29 @@ agent reads the repository locally, only with your consent.
 
 ## Install
 
-Copy the `talooner-onboard` folder into the place your agent reads skills from.
-
-Claude Code:
-
-```sh
-mkdir -p ~/.claude/skills
-cp -R talooner-onboard ~/.claude/skills/
-```
-
-Or, for one repository only:
+The installer downloads the pinned release, lists the agents it found and asks
+which ones to install for. Nothing is written until you choose:
 
 ```sh
-mkdir -p .claude/skills
-cp -R talooner-onboard .claude/skills/
+curl -fsSL https://talooner.dev/skills/install.sh | bash
 ```
 
-OpenCode:
+Answer with a number, several numbers (`1 2`), `all`, or `q` to abort.
+
+Name the agent for a non-interactive run, and add `--local` for the current
+repository only:
 
 ```sh
-mkdir -p ~/.config/opencode/skills
-cp -R talooner-onboard ~/.config/opencode/skills/
+curl -fsSL https://talooner.dev/skills/install.sh | bash -s -- --agent claude
+curl -fsSL https://talooner.dev/skills/install.sh | bash -s -- --local --agent opencode
 ```
 
-Or, for one repository only:
+Or copy the `talooner-onboard` folder yourself into the place your agent reads
+skills from:
 
-```sh
-mkdir -p .opencode/skills
-cp -R talooner-onboard .opencode/skills/
-```
-
-Codex:
-
-```sh
-mkdir -p ~/.agents/skills
-cp -R talooner-onboard ~/.agents/skills/
-```
-
-Or, for one repository only:
-
-```sh
-mkdir -p .agents/skills
-cp -R talooner-onboard .agents/skills/
-```
+- Claude Code: `~/.claude/skills/` or `.claude/skills/`
+- OpenCode: `~/.config/opencode/skills/` or `.opencode/skills/`
+- Codex: `~/.agents/skills/` or `.agents/skills/`
 
 Restart the agent if the skill does not appear.
 
@@ -116,16 +96,15 @@ violation gets an inline comment.
 
 ## Update
 
+Run the installer again; it replaces the installed folder:
+
 ```sh
-git pull
+curl -fsSL https://talooner.dev/skills/install.sh | bash
 ```
 
-Or download the latest release zip from
-`https://github.com/Talooner/talooner-skills/releases/latest/download/talooner-onboard.zip`
-and copy the folder again.
-
-Before the first release exists, use
-`https://github.com/Talooner/talooner-skills/archive/refs/heads/main.zip`.
+Or download the latest
+[`talooner-onboard.zip`](https://github.com/Talooner/talooner-skills/releases/latest/download/talooner-onboard.zip)
+and copy the folder over the old one.
 
 ## Security
 
@@ -136,9 +115,7 @@ agent and its model, not to Talooner.
 
 ## Contributing
 
-Issues and feedback: `https://github.com/Talooner/feedback`.
-
-Changes here need `scripts/check-skill.sh`, shellcheck, the starter rules test
-and the fixture suite. See the workflow in `.github/workflows/ci.yml`.
+This repository does not accept contributions or issues. Report errors and
+misuse in `https://github.com/Talooner/feedback`.
 
 Licensed under Apache-2.0. See `LICENSE`.
