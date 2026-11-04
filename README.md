@@ -115,9 +115,7 @@ agent and its model, not to Talooner.
 
 ## Contributing
 
-Issues and feedback: `https://github.com/Talooner/feedback`.
-
-Changes here need `scripts/check-skill.sh`, shellcheck, the starter rules test
-and the fixture suite. See the workflow in `.github/workflows/ci.yml`.
+This repository does not accept contributions or issues. Report errors and
+misuse in `https://github.com/Talooner/feedback`.
 
 Licensed under Apache-2.0. See `LICENSE`.
