@@ -2,6 +2,8 @@
 
 `app/` handles the HTTP surface. Everything here is checked at review time.
 
+## Handlers
+
 ### Return errors, do not log them in handlers
 
 A handler returns the error to the caller. Log at the edge, once.

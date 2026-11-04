@@ -134,8 +134,11 @@ Handle `unclear` and `error`; never leave them silent.
 
 ## Guides
 
-- Six to twelve `###` sections, one rule each; the first sentence is the rule.
-- `Applies to:` for a scoped section.
+- Six to twelve `###` rules, each under a `## <group>` heading; the first
+  sentence is the rule. A `###` with no `##` above it is skipped, so the guide
+  parses as empty and the sections review never runs.
+- `Applies to:` for a scoped rule, with the paths in backticks or
+  comma-separated; a line naming no path applies the rule to every file.
 - `## Specs` with `### <file path>` and one bullet per required case.
 - `## Advice` for taste that does not block.
 - Never duplicate a linter finding; name the file and the fix.

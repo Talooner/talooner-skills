@@ -57,28 +57,34 @@ path, touch that instead, and replace `internal/` with a root
 - `rules` is green and runs the rule tests (`tln test .talooner/`, or
   `.talooner/test-rules.sh` for a split ruleset).
 - `review` is green.
-- The `talooner` check is `success` in advice mode, with
-  `Changes requested (advisory)`.
+- The `talooner` check concludes `success` in advice mode; the advisory wording
+  ("Changes requested (advisory)") is in the check summary and the sticky
+  comment, not in the conclusion.
 - A sticky review comment names the sensitive-path rule.
-- The PR has an assignee. If it says `assign MR to nobody`, add CODEOWNERS or use
-  a confirmed user target.
+- If the rules assign a reviewer, the PR has an assignee; if it says
+  `assign MR to nobody`, add CODEOWNERS or use a confirmed user target. A spec
+  that chose block-and-comment has no assignee, and that is not a failure.
 - The review log shows the ruleset from `.talooner/`, not the legacy path.
 - The log shows `code units resolved` with `count` greater than `0`, and one of
   the units is the code root the probe touched. `count=0` means
   `.talooner/architecture.yaml` maps nothing this PR changed: no code unit, no AI
   review, no possible inline comment.
+- The log has no `llm_review_step_fallback` warning. If it does, the guide parsed
+  as no sections: every rule needs a `##` heading above its `###`.
 - `findings received` shows the review ran. It may legitimately be `count=0` on a
   clean probe, because a finding needs something to object to. To see an inline
-  comment itself, put something in the probe that a guide's `###` section
-  forbids.
+  comment itself, put something in the probe that a guide's `###` rule forbids.
 - If the decision model is configured, check the log for the decision call and
-  the facts it wrote. A missing call means the decision path is still unproven.
+  the facts it wrote. A successful decision call is not logged by every runner
+  release: treat "no `decide_step_failed` warning and no log line" as unproven
+  rather than as proof.
 
 ## 4. Confirm the lifecycle
 
 1. **Draft skip.** Open the probe as a draft first. There is no review comment
    on a draft; the review starts when the PR is ready.
-2. **Block.** The sensitive-path rule blocks and assigns the owner.
+2. **Block.** The sensitive-path rule blocks, and assigns the owner when the
+   ruleset has an assign.
 3. **Release.** Approve the PR at the head commit. The `pull_request_review`
    trigger re-runs the review; the gate rule stops firing and the check goes
    green. A review left on an older commit does not release it.
@@ -87,11 +93,25 @@ path, touch that instead, and replace `internal/` with a root
 5. **Auto-approve.** On a safe probe (non-sensitive path, description, confirmed
    check names passing), auto-approve approves it and comments "No PR-level rule
    holds this PR." A draft, a missing description, an unset `pr.tests_passing`,
-   or any open gate keeps it off.
+   or any open gate keeps it off. Auto-approve also approves a docs-only PR, so
+   the `APPROVED` review from the bot on a small fix PR is expected.
 6. **Sections finding.** If a root has a guide, break one `###` rule in the
    probe and confirm the review leaves an inline comment naming that file.
 7. **Split job.** For a split ruleset, the rules job output shows the joined
    `rules.tln` being tested, not a per-file failure.
+
+Steps 3 and 4 need a second account: GitHub refuses an approval on your own pull
+request, and the probe's author is whoever ran the onboarding. Use the other
+account's token:
+
+```sh
+GH_TOKEN=<the other account's token> gh pr review <number> --approve \
+  --body "probe: approve the head commit"
+```
+
+When the onboarding user is the only account, skip 3 and 4, say so in the
+handoff, and verify release on the first real PR reviewed by a teammate. Do not
+report the onboarding as incomplete because of it.
 
 ## 5. Close it
 
