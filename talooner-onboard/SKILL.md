@@ -570,6 +570,9 @@ Summarize:
   `.talooner/config.yaml` and `.talooner/architecture.yaml` are on the base
   branch, open a throwaway PR touching a sensitive path and a mapped code root,
   check the comment, block, assignment and `code units resolved`, then close it.
+- The release path is not provable on the probe, because the author cannot
+  approve their own PR/MR. Say it becomes available on the first real PR/MR,
+  where someone other than the author approves and the gate releases.
 
 Links: `https://talooner.dev/rules/`, `https://talooner.dev/install/`,
 `https://tln-lang.org/`, `https://github.com/Talooner/feedback`.

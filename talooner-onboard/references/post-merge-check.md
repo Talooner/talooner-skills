@@ -100,18 +100,11 @@ path, touch that instead, and replace `internal/` with a root
 7. **Split job.** For a split ruleset, the rules job output shows the joined
    `rules.tln` being tested, not a per-file failure.
 
-Steps 3 and 4 need a second account: GitHub refuses an approval on your own pull
-request, and the probe's author is whoever ran the onboarding. Use the other
-account's token:
-
-```sh
-GH_TOKEN=<the other account's token> gh pr review <number> --approve \
-  --body "probe: approve the head commit"
-```
-
-When the onboarding user is the only account, skip 3 and 4, say so in the
-handoff, and verify release on the first real PR reviewed by a teammate. Do not
-report the onboarding as incomplete because of it.
+Steps 3 and 4 cannot be exercised on the probe: GitHub refuses an approval on
+your own pull request, and the probe's author is whoever ran the onboarding. The
+release path is proven on the first real PR/MR, where someone other than the
+author approves and the gate releases on that head commit. There is nothing
+missing from the onboarding until then.
 
 ## 5. Close it
 
