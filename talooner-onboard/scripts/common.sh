@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-RUNNER_VERSION="1.2.1"
+RUNNER_VERSION="1.2.2"
 RUNNER_IMAGE="ghcr.io/talooner/talooner-runner:${RUNNER_VERSION}"
 export RUNNER_VERSION RUNNER_IMAGE
 

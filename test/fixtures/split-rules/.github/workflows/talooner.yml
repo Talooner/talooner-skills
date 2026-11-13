@@ -8,12 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.2.1 .talooner/test-rules.sh
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.2.2 .talooner/test-rules.sh
   review:
     needs: rules
     runs-on: ubuntu-latest
     steps:
-      - uses: docker://ghcr.io/talooner/talooner-runner:1.2.1-gh
+      - uses: docker://ghcr.io/talooner/talooner-runner:1.2.2-gh
         env:
           TALOONER_LICENSE_KEY: ${{ secrets.TALOONER_LICENSE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

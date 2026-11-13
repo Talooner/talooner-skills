@@ -154,7 +154,7 @@ done
 
 expect_private_clean "https://github.com/Talooner/talooner-skills"
 expect_private_clean "github.com/Talooner/talooner-skills.git"
-expect_private_clean "ghcr.io/talooner/talooner-runner:1.2.1"
+expect_private_clean "ghcr.io/talooner/talooner-runner:1.2.2"
 expect_private_hit "github.com/Talooner/talooner"
 expect_private_hit "github.com/Talooner/talooner.git"
 expect_private_hit "github.com/Talooner/talooner-plugin"
