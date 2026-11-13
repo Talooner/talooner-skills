@@ -233,7 +233,7 @@ Run the suite:
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/repo" -w /repo --entrypoint tln \
-  ghcr.io/talooner/talooner-runner:1.2.1 test .talooner/
+  ghcr.io/talooner/talooner-runner:1.2.2 test .talooner/
 ```
 
 Never delete a failing test to make the suite green. Fix the rule or ask the user.

@@ -3,8 +3,8 @@
 Generate the base from the pinned image, then adapt it:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.1 \
-  ghcr.io/talooner/talooner-runner:1.2.1 snippet github
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.2 \
+  ghcr.io/talooner/talooner-runner:1.2.2 snippet github
 ```
 
 Write the result to `.github/workflows/talooner.yml`.
@@ -12,9 +12,9 @@ Write the result to `.github/workflows/talooner.yml`.
 ## Jobs
 
 - `rules` checks out the repository and runs `tln test .talooner/` on the pinned
-  non-root image `ghcr.io/talooner/talooner-runner:1.2.1`.
+  non-root image `ghcr.io/talooner/talooner-runner:1.2.2`.
 - `review` needs `rules`, uses the root `-gh` image
-  `ghcr.io/talooner/talooner-runner:1.2.1-gh`, and runs the review.
+  `ghcr.io/talooner/talooner-runner:1.2.2-gh`, and runs the review.
 - `resolve` needs `review` and only flips review threads. It gets
   `contents: write`; the Talooner image never does.
 
@@ -26,7 +26,7 @@ When `.talooner/rules/*.tln` exists, the rules job joins them exactly like
 Talooner before testing:
 
 ```yaml
-      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.2.1 .talooner/test-rules.sh
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.2.2 .talooner/test-rules.sh
 ```
 
 Keep the `pull_request_review` trigger (`types: [submitted]`) alongside

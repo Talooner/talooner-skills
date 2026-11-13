@@ -3,8 +3,8 @@
 Generate the base from the pinned image:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.1 \
-  ghcr.io/talooner/talooner-runner:1.2.1 snippet gitlab
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.2 \
+  ghcr.io/talooner/talooner-runner:1.2.2 snippet gitlab
 ```
 
 Add `talooner-command`, `talooner-rules` and `talooner-review` to
@@ -18,7 +18,7 @@ Add `talooner-command`, `talooner-rules` and `talooner-review` to
   a `!talooner` comment on a merge request yields an empty artifact and the
   review job exits 0.
 - `talooner-rules` checks out the repository and runs `tln test .talooner/` on
-  `ghcr.io/talooner/talooner-runner:1.2.1`. For a split ruleset, run
+  `ghcr.io/talooner/talooner-runner:1.2.2`. For a split ruleset, run
   `sh .talooner/test-rules.sh` instead; it joins the files like Talooner does.
 - `talooner-review` needs `talooner-rules` and, optionally, `talooner-command`,
   runs the review on the same pinned image, and sets `GIT_STRATEGY: none`

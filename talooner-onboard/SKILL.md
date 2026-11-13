@@ -2,8 +2,8 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.2.2
-  runner_version: 1.2.1
+  version: 1.2.3
+  runner_version: 1.2.2
 ---
 
 # Onboard a repository to Talooner
@@ -55,7 +55,7 @@ directory being the skill folder.
 - Do not read source files before the analysis-consent step.
 - Do not claim success until `"$SKILL_DIR/scripts/verify.sh" --strict` passes.
   `verify: INCOMPLETE` means not ready.
-- Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.2.1`, never
+- Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.2.2`, never
   `latest`, for generated CI and local validation.
 - The review runs last. Generated CI starts it only after the repository's own
   tests and lints have finished: the wait step on GitHub, a later stage or
@@ -399,8 +399,8 @@ creating a duplicate.
 Generate the base from the pinned image:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.1 \
-  ghcr.io/talooner/talooner-runner:1.2.1 snippet github
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.2 \
+  ghcr.io/talooner/talooner-runner:1.2.2 snippet github
 ```
 
 GitLab: `snippet gitlab` writes `talooner-command`, `talooner-rules` and
@@ -418,8 +418,8 @@ GitHub Actions:
   rules check and the review. It is what makes `pr.checks_pending` false; the
   snippet ships it, so a workflow without one is stale. It needs
   `actions: read` in the review job's permissions.
-- Rules use `ghcr.io/talooner/talooner-runner:1.2.1`; review uses
-  `ghcr.io/talooner/talooner-runner:1.2.1-gh`.
+- Rules use `ghcr.io/talooner/talooner-runner:1.2.2`; review uses
+  `ghcr.io/talooner/talooner-runner:1.2.2-gh`.
 - For a split ruleset the rules job runs `--entrypoint sh` with
   `.talooner/test-rules.sh` instead of `--entrypoint tln … test .talooner/`.
   Keep the `pull_request_review` trigger: it re-runs the review after an
