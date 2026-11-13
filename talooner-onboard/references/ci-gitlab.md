@@ -3,23 +3,46 @@
 Generate the base from the pinned image:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.1.2 \
-  ghcr.io/talooner/talooner-runner:1.1.2 snippet gitlab
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.1 \
+  ghcr.io/talooner/talooner-runner:1.2.1 snippet gitlab
 ```
 
-Add `talooner-rules` and `talooner-review` to `.gitlab-ci.yml`.
+Add `talooner-command`, `talooner-rules` and `talooner-review` to
+`.gitlab-ci.yml`.
 
 ## Shape
 
+- `talooner-command` runs only on `$CI_PIPELINE_SOURCE == "trigger"` and turns
+  the webhook payload into `REVIEW_MR_IID` / `REVIEW_NOTE_ID` with
+  `talooner-step note-env`, passed on as a dotenv artifact. A trigger that is not
+  a `!talooner` comment on a merge request yields an empty artifact and the
+  review job exits 0.
 - `talooner-rules` checks out the repository and runs `tln test .talooner/` on
-  `ghcr.io/talooner/talooner-runner:1.1.2`. For a split ruleset, run
+  `ghcr.io/talooner/talooner-runner:1.2.1`. For a split ruleset, run
   `sh .talooner/test-rules.sh` instead; it joins the files like Talooner does.
-- `talooner-review` needs `talooner-rules`, runs the review on the same pinned
-  image, and sets `GIT_STRATEGY: none` because it does not need a checkout.
-- Keep `entrypoint: [""]` in both jobs. Without it GitLab runs the image
+- `talooner-review` needs `talooner-rules` and, optionally, `talooner-command`,
+  runs the review on the same pinned image, and sets `GIT_STRATEGY: none`
+  because it does not need a checkout.
+- Both `talooner-rules` and `talooner-review` also run on the `trigger` source,
+  so the review has a rules check in a comment-command pipeline too.
+- Keep `entrypoint: [""]` in every job. Without it GitLab runs the image
   entrypoint instead of the shell.
 - Do not set `GIT_STRATEGY: none` on the rules job; it needs the checkout.
 - Never name a job exactly `talooner`. The commit status uses that name.
+
+## Comment commands
+
+`!talooner /review` and `!talooner /stop` in a merge request note start a trigger
+pipeline: merge request pipelines cannot see notes. Add one project webhook
+(Settings → Webhooks, trigger: Comments) whose URL is
+
+```
+https://<gitlab host>/api/v4/projects/<project id>/ref/<default branch>/trigger/pipeline?token=<pipeline trigger token>
+```
+
+Create the token under Settings → CI/CD → Pipeline trigger tokens; it lives in
+the webhook URL and nowhere in the YAML. Without the webhook the jobs still run
+on merge request events, and comment commands do nothing.
 
 ## Stages
 

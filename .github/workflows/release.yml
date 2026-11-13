@@ -20,8 +20,8 @@ jobs:
           fi
       - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh talooner-onboard/assets/test-rules.sh scripts/*.sh test/run.sh
       - run: ./scripts/check-skill.sh
-      - run: docker run --rm -v "$PWD/talooner-onboard/assets:/repo/assets:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test assets/
-      - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test .talooner/
+      - run: docker run --rm -v "$PWD/talooner-onboard/assets:/repo/assets:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.2.1 test assets/
+      - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.2.1 test .talooner/
       - run: ./test/run.sh
       - run: zip -r talooner-onboard.zip talooner-onboard
       - run: gh release create "$GITHUB_REF_NAME" talooner-onboard.zip --title "$GITHUB_REF_NAME" --notes "talooner-onboard $GITHUB_REF_NAME"

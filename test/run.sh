@@ -244,16 +244,25 @@ expect_verify bad-ci "$TMP/bad-ci" 1
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-ci"
 rm -f "$TMP/gitlab-ci/.github/workflows/talooner.yml"
 cat > "$TMP/gitlab-ci.yml" <<'YAML'
+talooner-command:
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.2.1
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - talooner-step note-env "$TRIGGER_PAYLOAD" > talooner.env
+
 talooner-rules:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.1.2
+    name: ghcr.io/talooner/talooner-runner:1.2.1
     entrypoint: [""]
   script:
     - tln test .talooner/
 
 talooner-review:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.1.2-gh
+    name: ghcr.io/talooner/talooner-runner:1.2.1-gh
     entrypoint: [""]
   needs: [talooner-rules]
   script:
