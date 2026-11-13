@@ -13,6 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ./scripts/check-skill.sh
-      - run: docker run --rm -v "$PWD/talooner-onboard/assets:/repo/assets:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test assets/
-      - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.1.2 test .talooner/
+      - run: docker run --rm -v "$PWD/talooner-onboard/assets:/repo/assets:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.2.1 test assets/
+      - run: docker run --rm -v "$PWD/test/fixtures/clean-repo/.talooner:/repo/.talooner:ro" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.2.1 test .talooner/
       - run: ./test/run.sh

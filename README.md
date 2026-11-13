@@ -71,8 +71,12 @@ argument.
 ## Versioning
 
 `metadata.version` in `talooner-onboard/SKILL.md` is the release number. The
-release job fails unless the tag without its `v` equals that value, so
-`metadata.version: 1.2.0` ships as `v1.2.0` and never drifts.
+release job fails unless the tag without its `v` equals that value, so a tag and
+the metadata never drift.
+
+`metadata.runner_version` and `RUNNER_VERSION` in
+`talooner-onboard/scripts/common.sh` must agree; `scripts/check-skill.sh`
+enforces it. Bump both when a runner release lands.
 
 ## What it will not do
 
