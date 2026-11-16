@@ -24,7 +24,10 @@ Add `talooner-command`, `talooner-rules` and `talooner-review` to
   runs the review on the same pinned image, and sets `GIT_STRATEGY: none`
   because it does not need a checkout.
 - Both `talooner-rules` and `talooner-review` also run on the `trigger` source,
-  so the review has a rules check in a comment-command pipeline too.
+  so the review has a rules check in a comment-command pipeline too. A trigger
+  pipeline runs on the default branch, so that check tests the default branch's
+  `.talooner/`, not the merge request's; the merge request pipeline is what tests
+  the rules the MR changes.
 - Keep `entrypoint: [""]` in every job. Without it GitLab runs the image
   entrypoint instead of the shell.
 - Do not set `GIT_STRATEGY: none` on the rules job; it needs the checkout.
@@ -43,6 +46,14 @@ https://<gitlab host>/api/v4/projects/<project id>/ref/<default branch>/trigger/
 Create the token under Settings → CI/CD → Pipeline trigger tokens; it lives in
 the webhook URL and nowhere in the YAML. Without the webhook the jobs still run
 on merge request events, and comment commands do nothing.
+
+Every note starts that pipeline, not only a `!talooner` one, and
+`talooner-rules` runs whether or not `talooner-command` finds a command: a
+comment costs a checkout and a policy test. The pipeline also runs with
+`TALOONER_LICENSE_KEY` and the model keys, and nothing checks who wrote the
+note: anyone who can comment can spend them, and whoever can read the webhook
+settings can read the token. Restrict the webhook or add a member check to
+`talooner-command` before it runs the review on a public or busy project.
 
 ## Stages
 

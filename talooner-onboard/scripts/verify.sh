@@ -300,9 +300,9 @@ fi
 if [ -n "$ci_gitlab" ]; then
   if grep -Eq '^talooner-rules:' "$ci_gitlab"; then ok "GitLab rules job"; else bad "GitLab rules job missing"; fi
   if grep -Eq '^talooner-review:' "$ci_gitlab"; then ok "GitLab review job"; else bad "GitLab review job missing"; fi
-  if grep -Eq '^talooner-command:' "$ci_gitlab"; then ok "GitLab comment-command job"; else bad "GitLab comment-command job missing"; fi
+  if grep -Eq '^talooner-command:' "$ci_gitlab"; then ok "GitLab comment-command job"; else printf 'SKIP GitLab comment-command job (optional; add it for !talooner commands)\n'; fi
   if grep -q 'entrypoint: \[""\]' "$ci_gitlab"; then ok "GitLab entrypoint is empty"; else bad "GitLab entrypoint is not empty"; fi
-  if grep -Eq 'needs: \[talooner-rules\]' "$ci_gitlab"; then ok "GitLab review needs rules"; else bad "GitLab review does not need talooner-rules"; fi
+  if grep -Eq 'needs: *\[talooner-rules(,|\])|^[[:space:]]*- talooner-rules[[:space:]]*$' "$ci_gitlab"; then ok "GitLab review needs rules"; else bad "GitLab review does not need talooner-rules"; fi
   if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE")([^0-9A-Za-z._-]|$)" "$ci_gitlab"; then ok "GitLab uses pinned image"; else bad "GitLab does not use $RUNNER_IMAGE"; fi
   if [ "$split" = yes ]; then
     if grep -q -- 'test-rules.sh' "$ci_gitlab"; then ok "GitLab rules run .talooner/test-rules.sh"; else bad "GitLab rules do not run .talooner/test-rules.sh"; fi
