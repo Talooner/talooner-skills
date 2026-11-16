@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.2.3
+  version: 1.2.4
   runner_version: 1.2.2
 ---
 
@@ -445,7 +445,9 @@ GitLab CI:
   If the pipeline already uses `needs:`, adding the test/lint jobs to
   `talooner-review`'s `needs` is the equivalent ordering. If stages come only
   from an include, stop and ask the user to add the jobs by hand.
-- Keep `entrypoint: [""]` and `needs: [talooner-rules]`.
+- Keep `entrypoint: [""]`. `talooner-review` needs `talooner-rules` and, with
+  comment commands, `talooner-command` (`needs: [talooner-rules, talooner-command]`),
+  plus the test/lint jobs from the ordering rule above.
 - For a split ruleset the `talooner-rules` script is `sh .talooner/test-rules.sh`
   instead of `tln test .talooner/`.
 - Set `GIT_STRATEGY: none` on the review job only; the rules job needs the

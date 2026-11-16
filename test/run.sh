@@ -156,6 +156,42 @@ git -C "$TMP/ignored-config" -c user.name=fixture -c user.email=fixture@example.
 git -C "$TMP/ignored-config" -c user.name=fixture -c user.email=fixture@example.com commit -qm init
 expect_verify ignored-config "$TMP/ignored-config" 1
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-needs"
+cat > "$TMP/gitlab-needs/.gitlab-ci.yml" <<'YAML'
+talooner-rules:
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.2.2
+    entrypoint: [""]
+  script:
+    - tln test .talooner/
+
+talooner-review:
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.2.2
+    entrypoint: [""]
+  needs: [talooner-rules, test, lint]
+  variables:
+    TALOONER_LICENSE_KEY: $TALOONER_LICENSE_KEY
+    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+    CDM_URL: $CDM_URL
+    CDM_TOKEN: $CDM_TOKEN
+  script:
+    - talooner-step
+YAML
+git -C "$TMP/gitlab-needs" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/gitlab-needs" -c user.name=fixture -c user.email=fixture@example.com commit -qm gitlab-needs
+expect_verify gitlab-needs "$TMP/gitlab-needs" 0
+if grep -q 'SKIP GitLab comment-command job' "$TMP/gitlab-needs.out"; then
+  pass "verify accepts a GitLab review without the optional comment-command job"
+else
+  bad "verify fails a GitLab review without the optional comment-command job"
+fi
+
+cp -R "$TMP/gitlab-needs" "$TMP/gitlab-needs-block"
+perl -0pi -e 's/  needs: \[talooner-rules, test, lint\]\n/  needs:\n    - talooner-rules\n    - test\n    - lint\n/' "$TMP/gitlab-needs-block/.gitlab-ci.yml"
+git -C "$TMP/gitlab-needs-block" -c user.name=fixture -c user.email=fixture@example.com commit -qam gitlab-needs-block
+expect_verify gitlab-needs-block "$TMP/gitlab-needs-block" 0
+
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/legacy-rules"
 mkdir -p "$TMP/legacy-rules/.github/talooner"
 cp "$ROOT/test/fixtures/clean-repo/.talooner/rules.tln" "$TMP/legacy-rules/.github/talooner/rules.tln"
