@@ -1,0 +1,55 @@
+stages:
+  - test
+  - review
+  - qa
+  - qa-run
+
+.qa-app:
+  allow_failure: true
+  services:
+    - name: postgres:16
+      alias: postgres
+    - name: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA}
+      alias: web
+      command: [bin/qa-web]
+  variables:
+    FF_NETWORK_PER_BUILD: "true"
+    TALOONER_QA_HOOK_TOKEN: qa-${CI_PIPELINE_ID}-${CI_JOB_ID}
+    TALOONER_QA_PREVIEW_URL: http://web:3000
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+talooner-qa:
+  extends: .qa-app
+  stage: qa
+  image:
+    name: ghcr.io/talooner/talooner-runner:1.3.2
+    entrypoint: [""]
+  variables:
+    TALOONER_PROVIDER: gitlab
+    TALOONER_QA_CACHE_DIR: $CI_PROJECT_DIR/.qa-cache
+  cache:
+    key: qa-$CI_MERGE_REQUEST_IID
+    paths:
+      - .qa-cache/
+  script:
+    - talooner-qa catalog validate
+    - talooner-step qa --out qa-out --unclear yes
+  artifacts:
+    when: always
+    paths:
+      - qa-out/
+
+talooner-qa-run:
+  extends: .qa-app
+  stage: qa-run
+  image:
+    name: ghcr.io/talooner/talooner-qa:0.0.10
+    entrypoint: [""]
+  needs: [talooner-qa]
+  script:
+    - talooner-qa run --fail
+  artifacts:
+    when: always
+    reports:
+      junit: qa-out/junit.xml

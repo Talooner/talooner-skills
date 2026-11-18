@@ -387,6 +387,72 @@ else
   bad "doctor reports legacy, ignored and existing CI"
 fi
 
+QA_VERIFY="$ROOT/talooner-qa-onboard/scripts/verify.sh"
+QA_DOCTOR="$ROOT/talooner-qa-onboard/scripts/doctor.sh"
+
+expect_qa() {
+  name=$1
+  want=$2
+  needle=$3
+  out="$TMP/qa-$name.out"
+  if "$QA_VERIFY" --repo "$TMP/qa-$name" --strict >"$out" 2>&1; then got=0; else got=1; fi
+  if [ "$got" -eq "$want" ] && grep -q -- "$needle" "$out"; then
+    pass "qa verify $name"
+  else
+    cat "$out"
+    bad "qa verify $name (exit $got, want $want; log names: $needle)"
+  fi
+}
+
+# qa_repo <name>: the fixture as a repository; qa_commit <name> after changing it.
+qa_repo() { make_repo "$ROOT/test/fixtures/qa-repo" "$TMP/qa-$1"; }
+qa_commit() {
+  git -C "$TMP/qa-$1" -c user.name=fixture -c user.email=fixture@example.com add -A
+  git -C "$TMP/qa-$1" -c user.name=fixture -c user.email=fixture@example.com commit -qm "$1"
+}
+
+qa_repo clean
+expect_qa clean 0 'verify: PASS'
+if "$QA_DOCTOR" --repo "$TMP/qa-clean" >"$TMP/qa-doctor.out" 2>&1 \
+  && grep -q 'stack=rails' "$TMP/qa-doctor.out" \
+  && grep -q 'qa_hooks=talooner-qa-rails' "$TMP/qa-doctor.out" \
+  && grep -q 'qa_ci=.gitlab-ci.yml' "$TMP/qa-doctor.out"; then
+  pass "qa doctor reports the stack, hooks and QA CI"
+else
+  cat "$TMP/qa-doctor.out"
+  bad "qa doctor reports the stack, hooks and QA CI"
+fi
+
+qa_repo literal-token
+perl -pi -e 's/^(\s*TALOONER_QA_HOOK_TOKEN:).*/$1 qa-fixed-token/' "$TMP/qa-literal-token/.gitlab-ci.yml"
+qa_commit literal-token
+expect_qa literal-token 1 'literal TALOONER_QA_HOOK_TOKEN'
+
+qa_repo no-then
+printf '\n@page:orders\nBlock: open the orders again\n  When I click "Orders"\n' >> "$TMP/qa-no-then/.talooner/qa/blocks/orders/orders.feature"
+qa_commit no-then
+expect_qa no-then 1 'FAIL talooner-qa catalog validate'
+
+qa_repo no-guide
+rm "$TMP/qa-no-guide/docs/guides/roles.md"
+qa_commit no-guide
+expect_qa no-guide 1 'guide docs/guides/roles.md does not exist'
+
+qa_repo latest-image
+perl -pi -e 's/talooner-qa:0\.0\.10/talooner-qa:latest/' "$TMP/qa-latest-image/.gitlab-ci.yml"
+qa_commit latest-image
+expect_qa latest-image 1 ':latest Talooner image'
+
+qa_repo unguarded-mount
+perl -pi -e 's/ if defined.*//' "$TMP/qa-unguarded-mount/config/routes.rb"
+qa_commit unguarded-mount
+expect_qa unguarded-mount 1 'without TaloonerQa.enabled?'
+
+qa_repo no-run-job
+perl -pi -e 's/talooner-qa run --fail/echo skipped/' "$TMP/qa-no-run-job/.gitlab-ci.yml"
+qa_commit no-run-job
+expect_qa no-run-job 1 'no CI job runs talooner-qa run'
+
 if [ "$fail" -eq 0 ]; then
   printf 'fixtures: PASS\n'
   exit 0

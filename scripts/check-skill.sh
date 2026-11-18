@@ -7,10 +7,10 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 private_paths_match() {
   perl -0777 -ne '
     my $t = $_;
-    $t =~ s{(?:https?://)?ghcr\.io/talooner/talooner-runner(?::[A-Za-z0-9._-]+)?}{ALLOWED_IMAGE}g;
+    $t =~ s{(?:https?://)?ghcr\.io/talooner/talooner-(?:runner|qa)(?::[A-Za-z0-9._-]+)?}{ALLOWED_IMAGE}g;
     $t =~ s{(?:https?://)?github\.com/Talooner/talooner-skills(?:\.git)?(?:[/?#][^\s]*)?}{ALLOWED_SKILLS}g;
-    if ($t =~ m{(?:https?://)?github\.com/[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)} ||
-        $t =~ m{\b[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner)(?:\.git)?(?:[/?#:\s]|$)}) {
+    if ($t =~ m{(?:https?://)?github\.com/[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner|talooner-qa)(?:\.git)?(?:[/?#:\s]|$)} ||
+        $t =~ m{\b[Tt]alooner/(?:talooner|talooner-plugin|talooner-runner|talooner-qa)(?:\.git)?(?:[/?#:\s]|$)}) {
       print "forbidden private path\n";
       exit 1;
     }
@@ -160,6 +160,10 @@ expect_private_hit "github.com/Talooner/talooner.git"
 expect_private_hit "github.com/Talooner/talooner-plugin"
 expect_private_hit "github.com/Talooner/talooner-runner"
 expect_private_hit "Talooner/talooner"
+expect_private_clean "ghcr.io/talooner/talooner-qa:0.0.10"
+expect_private_clean "https://github.com/Talooner/talooner-qa-rails.git"
+expect_private_hit "github.com/Talooner/talooner-qa"
+expect_private_hit "Talooner/talooner-qa and more"
 expect_private_hit "https://github.com/Talooner/talooner-skills and github.com/Talooner/talooner-plugin"
 
 expect_secret_clean "TLN1.<payload>.<signature>"
@@ -174,9 +178,53 @@ expect_secret_hit "xoxb-$(rep A 12)" "a Slack token"
 expect_secret_hit "AKIA$(rep A 16)" "an AWS key"
 expect_secret_hit "-----BEGIN ""RSA PRIVATE KEY-----" "a private key"
 
+# talooner-qa-onboard ships in the same release: one version, one runner.
+qa=$ROOT/talooner-qa-onboard
+[ -f "$qa/SKILL.md" ] || die "missing talooner-qa-onboard/SKILL.md"
+qfm=$(awk 'NR==1 && /^---$/{f=1; next} f && /^---$/{exit} f' "$qa/SKILL.md")
+qname=$(printf '%s\n' "$qfm" | sed -n 's/^name:[[:space:]]*//p' | head -1)
+qdesc=$(printf '%s\n' "$qfm" | sed -n 's/^description:[[:space:]]*//p' | head -1)
+qmeta=$(printf '%s\n' "$qfm" | awk '/^metadata:/{f=1; next} f && /^[^ ]/{f=0} f')
+qversion=$(printf '%s\n' "$qmeta" | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -1)
+qrunner=$(printf '%s\n' "$qmeta" | sed -n 's/^[[:space:]]*runner_version:[[:space:]]*//p' | head -1)
+qqa=$(printf '%s\n' "$qmeta" | sed -n 's/^[[:space:]]*qa_version:[[:space:]]*//p' | head -1)
+qcommon_runner=$(sed -n 's/^RUNNER_VERSION="\([^"]*\)"$/\1/p' "$qa/scripts/common.sh" | head -1)
+qcommon_qa=$(sed -n 's/^QA_VERSION="\([^"]*\)"$/\1/p' "$qa/scripts/common.sh" | head -1)
+
+if [ "$qname" = "talooner-qa-onboard" ]; then ok "qa: frontmatter name matches folder"; else bad "qa: frontmatter name is '${qname:-empty}'"; fi
+qlen=$(printf '%s' "$qdesc" | LC_ALL=C wc -c | tr -d ' ')
+if [ "$qlen" -ge 1 ] && [ "$qlen" -le 1024 ]; then ok "qa: description length ${qlen}"; else bad "qa: description length ${qlen} is outside 1-1024"; fi
+case "$qdesc" in
+  *"Talooner QA"*) ok "qa: description names Talooner QA" ;;
+  *) bad "qa: description does not name Talooner QA" ;;
+esac
+if [ -n "$qversion" ] && [ "$qversion" = "$metadata_version" ]; then
+  ok "qa: metadata.version matches talooner-onboard"
+else
+  bad "qa: metadata.version '${qversion:-missing}' differs from talooner-onboard '${metadata_version:-missing}'"
+fi
+if [ -n "$qrunner" ] && [ "$qrunner" = "$runner_metadata" ] && [ "$qrunner" = "$qcommon_runner" ]; then
+  ok "qa: runner version ${qrunner} matches"
+else
+  bad "qa: runner_version '${qrunner:-missing}', RUNNER_VERSION '${qcommon_runner:-missing}' and talooner-onboard '${runner_metadata:-missing}' differ"
+fi
+if [ -n "$qqa" ] && [ "$qqa" = "$qcommon_qa" ]; then
+  ok "qa: QA_VERSION matches metadata.qa_version"
+else
+  bad "qa: QA_VERSION '${qcommon_qa:-missing}' does not match metadata.qa_version '${qqa:-missing}'"
+fi
+if grep -Fq "ghcr.io/talooner/talooner-qa:${qqa}" "$qa/SKILL.md"; then ok "qa: SKILL.md pins the qa image"; else bad "qa: SKILL.md does not pin ghcr.io/talooner/talooner-qa:${qqa}"; fi
+
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  if [ -e "$qa/$rel" ]; then ok "qa: referenced file exists: $rel"; else bad "qa: referenced file missing: $rel"; fi
+done <<EOF
+$(perl -ne 'while (m{(?:^|[\s`(])((?:references|scripts|assets)/[A-Za-z0-9._/-]+)}g) { print "$1\n" }' "$qa/SKILL.md" | sort -u)
+EOF
+
 files=$(mktemp)
 {
-  find "$skill" -type f
+  find "$skill" "$qa" -type f
   printf '%s\n' "$ROOT/README.md"
 } | sort -u > "$files"
 

@@ -7,7 +7,14 @@ agents. Your agent interviews you about the repository, writes
 `.talooner/onboarding.md`, writes tested `tln` rules, guides and CI, verifies
 everything with a pinned Talooner runner image, and prepares a draft PR/MR.
 
-The skill runs in your repository. Talooner never receives your code. Your own
+`talooner-qa-onboard` adds Talooner QA to a repository that has a review: your
+agent wires the app's test-only `/__qa/*` hooks (with
+[talooner-qa-rails](https://github.com/Talooner/talooner-qa-rails) on Rails),
+writes the `.talooner/qa/` catalog of blocks and a roles guide, adds the CI jobs
+that compose and run a PR's browser scenarios, and verifies the catalog with the
+pinned runner image. See [QA onboarding](#qa-onboarding).
+
+The skills run in your repository. Talooner never receives your code. Your own
 agent reads the repository locally, only with your consent.
 
 ## Requirements
@@ -68,15 +75,39 @@ argument.
 - `.talooner/review.md` when there are repo-wide guidelines
 - `.github/workflows/talooner.yml` or Talooner jobs in `.gitlab-ci.yml`
 
+## QA onboarding
+
+Install `talooner-qa-onboard` the same way: copy the folder from
+[`talooner-qa-onboard.zip`](https://github.com/Talooner/talooner-skills/releases/latest/download/talooner-qa-onboard.zip)
+into your agent's skills folder. Then say:
+
+> onboard this repo to Talooner QA
+
+It needs a license with the `qa` feature, a Talooner review on the repository,
+and a way to run the PR's app in CI. It writes:
+
+- the hooks: `talooner-qa-rails` in a test or preview group, mounted behind its
+  token, and `config/initializers/talooner_qa.rb` (Rails); the contract for
+  other stacks
+- `.talooner/qa/config.yaml` and `.talooner/qa/blocks/<area>/*.feature`
+- `docs/guides/roles.md` when no permissions doc exists
+- the `talooner-qa` and `talooner-qa-run` jobs in `.gitlab-ci.yml`, or a `qa`
+  job in `.github/workflows/talooner.yml`
+
+`scripts/verify.sh --strict` validates the catalog with the pinned runner image
+and fails on a committed hook token, a missing guide, an unguarded mount or an
+unpinned image.
+
 ## Versioning
 
-`metadata.version` in `talooner-onboard/SKILL.md` is the release number. The
-release job fails unless the tag without its `v` equals that value, so a tag and
-the metadata never drift.
+`metadata.version` in `talooner-onboard/SKILL.md` is the release number, and
+`talooner-qa-onboard` carries the same one. The release job fails unless the tag
+without its `v` equals that value, so a tag and the metadata never drift.
 
-`metadata.runner_version` and `RUNNER_VERSION` in
-`talooner-onboard/scripts/common.sh` must agree; `scripts/check-skill.sh`
-enforces it. Bump both when a runner release lands.
+`metadata.runner_version` and `RUNNER_VERSION` in each skill's
+`scripts/common.sh` must agree, and so must `metadata.qa_version` and
+`QA_VERSION` in `talooner-qa-onboard`; `scripts/check-skill.sh` enforces it.
+Bump them when a runner or QA release lands.
 
 ## What it will not do
 

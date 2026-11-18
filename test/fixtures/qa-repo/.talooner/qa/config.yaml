@@ -1,0 +1,11 @@
+# Talooner QA settings. Blocks live in blocks/<area>/*.feature.
+time_budget: 5m
+# Blocks every PR runs, whatever it touches.
+smoke:
+  - open the order list
+# Who may do what; compose decides which roles a scenario tests from this page alone.
+guide: docs/guides/roles.md
+# base: a PR cannot rewrite the guide to pass. head: PRs change roles together with it.
+guide_from: base
+# The sign-in page a guest who may not open a page lands on.
+login: new_user_session

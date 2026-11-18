@@ -2,7 +2,7 @@
 name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
-  version: 1.2.5
+  version: 1.3.0
   runner_version: 1.3.2
 ---
 

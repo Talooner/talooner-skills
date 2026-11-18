@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh talooner-onboard/assets/test-rules.sh scripts/*.sh test/run.sh
+      - run: docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x -P SCRIPTDIR talooner-onboard/scripts/*.sh talooner-qa-onboard/scripts/*.sh talooner-onboard/assets/test-rules.sh scripts/*.sh test/run.sh
   skill:
     runs-on: ubuntu-latest
     steps:
