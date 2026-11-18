@@ -289,6 +289,8 @@ if [ -n "$ci_github" ]; then
   if grep -Eq '^  rules:' "$ci_github"; then ok "GitHub rules job"; else bad "GitHub rules job missing"; fi
   if grep -Eq '^  review:' "$ci_github"; then ok "GitHub review job"; else bad "GitHub review job missing"; fi
   if grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE_GH")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub review uses pinned -gh image"; else bad "GitHub review image is not $RUNNER_IMAGE_GH"; fi
+  if grep -q 'wait for the other checks on this commit' "$ci_github"; then ok "GitHub review waits for the other checks"; else bad "GitHub review has no wait step: it reads the commit while CI runs, pr.checks_pending blocks every push, and nothing re-runs the review when CI ends (references/ci-github.md, Run after the other checks)"; fi
+  if grep -Eq '^[[:space:]]+actions: read' "$ci_github"; then ok "GitHub review can read this run"; else bad "GitHub review lacks actions: read, which the wait step needs to find this run's check suite"; fi
   if [ "$split" = yes ]; then
     if grep -q -- 'test-rules.sh' "$ci_github" && grep -Eq "(^|[^0-9A-Za-z._-])$(image_re "$RUNNER_IMAGE")([^0-9A-Za-z._-]|$)" "$ci_github"; then ok "GitHub rules run .talooner/test-rules.sh on the pinned image"; else bad "GitHub rules do not run .talooner/test-rules.sh on $RUNNER_IMAGE"; fi
   elif grep -Eq -- "--entrypoint tln $(image_re "$RUNNER_IMAGE") test" "$ci_github"; then ok "GitHub rules use pinned image"; else bad "GitHub rules image is not $RUNNER_IMAGE"; fi

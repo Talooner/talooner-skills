@@ -3,7 +3,7 @@ name: talooner-onboard
 description: Onboard the current repository to Talooner — interview the user, write .talooner/onboarding.md, write tested tln rules and guides, add GitHub Actions or GitLab CI, verify with the pinned runner image, and prepare a draft PR/MR. Use when the user asks to onboard this repo to Talooner, set up Talooner rules, or add a Talooner PR guard.
 metadata:
   version: 1.2.4
-  runner_version: 1.2.2
+  runner_version: 1.3.2
 ---
 
 # Onboard a repository to Talooner
@@ -55,13 +55,19 @@ directory being the skill folder.
 - Do not read source files before the analysis-consent step.
 - Do not claim success until `"$SKILL_DIR/scripts/verify.sh" --strict` passes.
   `verify: INCOMPLETE` means not ready.
-- Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.2.2`, never
+- Use the pinned runner image `ghcr.io/talooner/talooner-runner:1.3.2`, never
   `latest`, for generated CI and local validation.
 - The review runs last. Generated CI starts it only after the repository's own
   tests and lints have finished: the wait step on GitHub, a later stage or
   `needs:` on GitLab. A review that races CI sees `pr.checks_pending == true`,
   the base ruleset refuses to approve a moving target, and nothing re-runs it
   when CI ends (`references/ci-github.md`, `references/ci-gitlab.md`).
+- An existing `.github/workflows/talooner.yml` is brought to the current
+  contract, not left as it is: insert the wait step and `actions: read`, the
+  `rules` → `review` → `resolve` jobs and the env names it lacks, keeping the
+  user's own edits. Image tags do not show the age of a workflow: a file from an
+  older snippet gets its tags bumped and still lacks the steps. `verify.sh`
+  fails it.
 - Every PR-level blocking rule has a release condition: `is "approved"`
   (`review.human.approved` on GitHub, `review.<team>.approved` on GitLab) and
   `review.changes_requested == false`. A gate that can never release makes a
@@ -399,8 +405,8 @@ creating a duplicate.
 Generate the base from the pinned image:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.2 \
-  ghcr.io/talooner/talooner-runner:1.2.2 snippet github
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.3.2 \
+  ghcr.io/talooner/talooner-runner:1.3.2 snippet github
 ```
 
 GitLab: `snippet gitlab` writes `talooner-command`, `talooner-rules` and
@@ -418,8 +424,8 @@ GitHub Actions:
   rules check and the review. It is what makes `pr.checks_pending` false; the
   snippet ships it, so a workflow without one is stale. It needs
   `actions: read` in the review job's permissions.
-- Rules use `ghcr.io/talooner/talooner-runner:1.2.2`; review uses
-  `ghcr.io/talooner/talooner-runner:1.2.2-gh`.
+- Rules use `ghcr.io/talooner/talooner-runner:1.3.2`; review uses
+  `ghcr.io/talooner/talooner-runner:1.3.2-gh`.
 - For a split ruleset the rules job runs `--entrypoint sh` with
   `.talooner/test-rules.sh` instead of `--entrypoint tln … test .talooner/`.
   Keep the `pull_request_review` trigger: it re-runs the review after an

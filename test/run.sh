@@ -67,6 +67,17 @@ else
   bad "verify does not name the missing test-rules.sh"
 fi
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/no-wait-step"
+perl -0pi -e 's{ *- name: wait for the other checks on this commit\n *run: [^\n]*\n}{}' "$TMP/no-wait-step/.github/workflows/talooner.yml"
+git -C "$TMP/no-wait-step" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/no-wait-step" -c user.name=fixture -c user.email=fixture@example.com commit -qm no-wait-step
+expect_verify no-wait-step "$TMP/no-wait-step" 1
+if grep -q 'has no wait step' "$TMP/no-wait-step.out"; then
+  pass "verify names the missing wait step"
+else
+  bad "verify does not name the missing wait step"
+fi
+
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/missing-guide"
 mv "$TMP/missing-guide/docs/guides/app.md" "$TMP/missing-guide/docs/guides/app.removed"
 git -C "$TMP/missing-guide" -c user.name=fixture -c user.email=fixture@example.com add -A
@@ -160,14 +171,14 @@ make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-needs"
 cat > "$TMP/gitlab-needs/.gitlab-ci.yml" <<'YAML'
 talooner-rules:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   script:
     - tln test .talooner/
 
 talooner-review:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   needs: [talooner-rules, test, lint]
   variables:
@@ -282,7 +293,7 @@ rm -f "$TMP/gitlab-ci/.github/workflows/talooner.yml"
 cat > "$TMP/gitlab-ci.yml" <<'YAML'
 talooner-command:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   rules:
     - if: $CI_PIPELINE_SOURCE == "trigger"
@@ -291,14 +302,14 @@ talooner-command:
 
 talooner-rules:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   script:
     - tln test .talooner/
 
 talooner-review:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2-gh
+    name: ghcr.io/talooner/talooner-runner:1.3.2-gh
     entrypoint: [""]
   needs: [talooner-rules]
   script:

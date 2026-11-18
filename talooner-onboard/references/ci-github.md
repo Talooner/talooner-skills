@@ -3,8 +3,8 @@
 Generate the base from the pinned image, then adapt it:
 
 ```sh
-docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.2.2 \
-  ghcr.io/talooner/talooner-runner:1.2.2 snippet github
+docker run --rm -e TALOONER_IMAGE=ghcr.io/talooner/talooner-runner:1.3.2 \
+  ghcr.io/talooner/talooner-runner:1.3.2 snippet github
 ```
 
 Write the result to `.github/workflows/talooner.yml`.
@@ -12,9 +12,9 @@ Write the result to `.github/workflows/talooner.yml`.
 ## Jobs
 
 - `rules` checks out the repository and runs `tln test .talooner/` on the pinned
-  non-root image `ghcr.io/talooner/talooner-runner:1.2.2`.
+  non-root image `ghcr.io/talooner/talooner-runner:1.3.2`.
 - `review` needs `rules`, uses the root `-gh` image
-  `ghcr.io/talooner/talooner-runner:1.2.2-gh`, and runs the review.
+  `ghcr.io/talooner/talooner-runner:1.3.2-gh`, and runs the review.
 - `resolve` needs `review` and only flips review threads. It gets
   `contents: write`; the Talooner image never does.
 
@@ -26,7 +26,7 @@ When `.talooner/rules/*.tln` exists, the rules job joins them exactly like
 Talooner before testing:
 
 ```yaml
-      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.2.2 .talooner/test-rules.sh
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint sh ghcr.io/talooner/talooner-runner:1.3.2 .talooner/test-rules.sh
 ```
 
 Keep the `pull_request_review` trigger (`types: [submitted]`) alongside
@@ -160,3 +160,18 @@ TALOONER_PROVIDER=github GITHUB_TOKEN="$(gh auth token)" \
 If `.github/workflows/talooner.yml` exists and is already a Talooner workflow,
 show it and ask before changing it. If it is a different workflow, stop and let
 the user choose another file.
+
+A Talooner workflow is never left as it is. Compare it with the snippet from the
+pinned image (`snippet github`) and insert whatever the contract needs and the
+file lacks, keeping the user's own edits:
+
+- the `rules` → `review` → `resolve` jobs,
+- the wait step and `actions: read` (Run after the other checks),
+- the pinned `TALOONER_LICENSE_KEY` and model env names it is missing,
+- the triggers the user relies on (`pull_request`, `pull_request_review`,
+  `issue_comment`).
+
+Insert; do not regenerate the file unless the user asks for that. A file from an
+older snippet looks current because its image tags were bumped, so the version
+is the one thing that tells nothing: check the steps, not the tag.
+`scripts/verify.sh` fails a workflow that has no wait step or no `actions: read`.
