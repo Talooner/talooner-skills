@@ -62,6 +62,12 @@ directory being the skill folder.
   `needs:` on GitLab. A review that races CI sees `pr.checks_pending == true`,
   the base ruleset refuses to approve a moving target, and nothing re-runs it
   when CI ends (`references/ci-github.md`, `references/ci-gitlab.md`).
+- An existing `.github/workflows/talooner.yml` is brought to the current
+  contract, not left as it is: insert the wait step and `actions: read`, the
+  `rules` → `review` → `resolve` jobs and the env names it lacks, keeping the
+  user's own edits. Image tags do not show the age of a workflow: a file from an
+  older snippet gets its tags bumped and still lacks the steps. `verify.sh`
+  fails it.
 - Every PR-level blocking rule has a release condition: `is "approved"`
   (`review.human.approved` on GitHub, `review.<team>.approved` on GitLab) and
   `review.changes_requested == false`. A gate that can never release makes a

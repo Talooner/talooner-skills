@@ -59,6 +59,9 @@ Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
   refuses to approve a moving target. Fix the ordering
   (`references/ci-github.md`, `references/ci-gitlab.md`); a tenant rule that
   comments on `pr.checks_pending == true` only makes the block visible.
+  `verify.sh` printing `GitHub review has no wait step` means the workflow came
+  from an older snippet: insert the step and `actions: read` rather than
+  regenerating the file (`references/ci-github.md`, Existing workflow).
 
 ## Sensitive PRs
 

@@ -10,7 +10,13 @@ jobs:
   review:
     needs: rules
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      actions: read
     steps:
+      - name: wait for the other checks on this commit
+        run: echo "no checks pending"
       - uses: docker://ghcr.io/talooner/talooner-runner:1.2.2-gh
         env:
           TALOONER_LICENSE_KEY: ${{ secrets.TALOONER_LICENSE_KEY }}

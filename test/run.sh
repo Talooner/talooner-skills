@@ -67,6 +67,17 @@ else
   bad "verify does not name the missing test-rules.sh"
 fi
 
+make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/no-wait-step"
+perl -0pi -e 's{ *- name: wait for the other checks on this commit\n *run: [^\n]*\n}{}' "$TMP/no-wait-step/.github/workflows/talooner.yml"
+git -C "$TMP/no-wait-step" -c user.name=fixture -c user.email=fixture@example.com add -A
+git -C "$TMP/no-wait-step" -c user.name=fixture -c user.email=fixture@example.com commit -qm no-wait-step
+expect_verify no-wait-step "$TMP/no-wait-step" 1
+if grep -q 'has no wait step' "$TMP/no-wait-step.out"; then
+  pass "verify names the missing wait step"
+else
+  bad "verify does not name the missing wait step"
+fi
+
 make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/missing-guide"
 mv "$TMP/missing-guide/docs/guides/app.md" "$TMP/missing-guide/docs/guides/app.removed"
 git -C "$TMP/missing-guide" -c user.name=fixture -c user.email=fixture@example.com add -A

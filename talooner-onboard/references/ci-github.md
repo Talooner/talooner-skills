@@ -160,3 +160,18 @@ TALOONER_PROVIDER=github GITHUB_TOKEN="$(gh auth token)" \
 If `.github/workflows/talooner.yml` exists and is already a Talooner workflow,
 show it and ask before changing it. If it is a different workflow, stop and let
 the user choose another file.
+
+A Talooner workflow is never left as it is. Compare it with the snippet from the
+pinned image (`snippet github`) and insert whatever the contract needs and the
+file lacks, keeping the user's own edits:
+
+- the `rules` → `review` → `resolve` jobs,
+- the wait step and `actions: read` (Run after the other checks),
+- the pinned `TALOONER_LICENSE_KEY` and model env names it is missing,
+- the triggers the user relies on (`pull_request`, `pull_request_review`,
+  `issue_comment`).
+
+Insert; do not regenerate the file unless the user asks for that. A file from an
+older snippet looks current because its image tags were bumped, so the version
+is the one thing that tells nothing: check the steps, not the tag.
+`scripts/verify.sh` fails a workflow that has no wait step or no `actions: read`.
