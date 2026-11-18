@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.2.2 test .talooner/
+      - run: docker run --rm -v "$PWD:/repo" -w /repo --entrypoint tln ghcr.io/talooner/talooner-runner:1.3.2 test .talooner/
   review:
     needs: rules
     runs-on: ubuntu-latest
@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: wait for the other checks on this commit
         run: echo "no checks pending"
-      - uses: docker://ghcr.io/talooner/talooner-runner:1.2.2-gh
+      - uses: docker://ghcr.io/talooner/talooner-runner:1.3.2-gh
         env:
           TALOONER_LICENSE_KEY: ${{ secrets.TALOONER_LICENSE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
