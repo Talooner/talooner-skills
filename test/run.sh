@@ -171,14 +171,14 @@ make_repo "$ROOT/test/fixtures/clean-repo" "$TMP/gitlab-needs"
 cat > "$TMP/gitlab-needs/.gitlab-ci.yml" <<'YAML'
 talooner-rules:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   script:
     - tln test .talooner/
 
 talooner-review:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   needs: [talooner-rules, test, lint]
   variables:
@@ -293,7 +293,7 @@ rm -f "$TMP/gitlab-ci/.github/workflows/talooner.yml"
 cat > "$TMP/gitlab-ci.yml" <<'YAML'
 talooner-command:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   rules:
     - if: $CI_PIPELINE_SOURCE == "trigger"
@@ -302,14 +302,14 @@ talooner-command:
 
 talooner-rules:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2
+    name: ghcr.io/talooner/talooner-runner:1.3.2
     entrypoint: [""]
   script:
     - tln test .talooner/
 
 talooner-review:
   image:
-    name: ghcr.io/talooner/talooner-runner:1.2.2-gh
+    name: ghcr.io/talooner/talooner-runner:1.3.2-gh
     entrypoint: [""]
   needs: [talooner-rules]
   script:

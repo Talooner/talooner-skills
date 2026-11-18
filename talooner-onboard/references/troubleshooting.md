@@ -153,5 +153,5 @@ Read the legacy rules, propose a merge, and migrate them. `doctor.sh` reports
 ## Still stuck
 
 Open an issue at `https://github.com/Talooner/feedback` with the command, the
-error and the versions from `docker run --rm ghcr.io/talooner/talooner-runner:1.2.2 version`.
+error and the versions from `docker run --rm ghcr.io/talooner/talooner-runner:1.3.2 version`.
 Never include a key, token or code.
